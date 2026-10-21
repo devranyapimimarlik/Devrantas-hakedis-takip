@@ -1,0 +1,129 @@
+{
+  "brand": {
+    "name": "Devrantaş Yapı Mimarlık",
+    "type": "Luxury Construction & Architectural ERP / CRM Finance System",
+    "tagline": "Şantiye Finans, Hakediş ve Cari Hesap Yönetim Platformu",
+    "tone": "Ultra-Luxury, Prestigious, Precision Engineering, High-Trust Architectural ERP"
+  },
+  "color_palette": {
+    "theme_mode": "Warm Cream & Deep Charcoal with Regal Gold Accents (Light-mode default with dark luxury mode support)",
+    "background_primary": "#FDFBF7",
+    "background_secondary": "#F5F0E6",
+    "background_card": "#FFFFFF",
+    "background_card_hover": "#FAF7F0",
+    "text_primary": "#1C1917",
+    "text_secondary": "#57534E",
+    "text_muted": "#78716C",
+    "gold_primary": "#B8860B",
+    "gold_accent": "#D4AF37",
+    "gold_light_bg": "#FAF5E8",
+    "gold_border": "#E2D3B4",
+    "gold_text_on_dark": "#E6CA65",
+    "charcoal_dark": "#18181B",
+    "border_subtle": "#E7E5E4",
+    "border_gold_glow": "#D4AF3740",
+    "status": {
+      "success_green": "#15803D",
+      "warning_amber": "#B45309",
+      "danger_red": "#B91C1C",
+      "info_blue": "#1D4ED8"
+    }
+  },
+  "typography": {
+    "heading_font": "Cormorant Garamond, Serif (Google Fonts / Elegant Architectural Display)",
+    "body_font": "Manrope, Sans-Serif (Google Fonts / High Clarity Financial Data)",
+    "mono_font": "JetBrains Mono, Monospace (For Currency TRY, Check Numbers & Percentages)",
+    "scale": {
+      "h1": "text-3xl sm:text-4xl lg:text-5xl font-serif font-bold tracking-tight text-[#1C1917]",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl font-serif font-semibold text-[#1C1917]",
+      "h3": "text-xl sm:text-2xl font-serif font-medium text-[#1C1917]",
+      "h4": "text-lg sm:text-xl font-sans font-semibold text-[#1C1917]",
+      "body": "text-sm sm:text-base font-sans text-[#1C1917] leading-relaxed",
+      "subtext": "text-xs sm:text-sm font-sans text-[#57534E]",
+      "label_gold": "text-xs font-mono uppercase tracking-widest text-[#B8860B] font-semibold"
+    }
+  },
+  "responsive": {
+    "breakpoint": "Mobile-first baseline (375px+ up to 1536px+)",
+    "layout": "Reflow 12-column desktop grids into stacked single-column viewports on mobile with collapsible sidebar navigation and floating mobile action bar.",
+    "typography": "Fluid rem-based scaling. Inputs minimum 16px font-size to prevent iOS forced zoom.",
+    "overflow_guard": "All scrollable containers must use overflow-x-hidden on layout roots and table wrappers with sticky headers and responsive touch scrolls.",
+    "tap_targets": "Minimum 44px x 44px interactive tap targets for mobile usability on all buttons, select menus, and icons."
+  },
+  "key_features_and_flows": [
+    {
+      "name": "Dashboard",
+      "description": "Şantiye kar/zarar özeti, nakit akışı grafikleri, 7 gün / 3 gün / bugün vadesi gelen çek, kira, kart ve kredi ödemeleri canlı uyarı panelı."
+    },
+    {
+      "name": "Şantiye (Proje) Yönetimi",
+      "description": "Projeler listesi ve detay kartları, otomatik %6 genel gider kesintisi, kar oranı canlı göstergesi, yapay zeka ilerleme-maliyet sapma uyarısı."
+    },
+    {
+      "name": "Müşteri Cari Hesaplar",
+      "description": "Müşteri listesi, bakiye durumları, Cari Ekstre ve Detaylı Cari Ekstre raporlama (PDF indirme destekli)."
+    },
+    {
+      "name": "Taşeron Cari Hesaplar",
+      "description": "Taşeron listesi, borç/alacak bakiyesi, hakediş geçmişi ve ekstre dökümü."
+    },
+    {
+      "name": "Hakediş Oluşturma",
+      "description": "Müşteri ve taşeron için kalem kalem hakediş cetveli (metraj, birim fiyat, otomatik KDV, %6 genel gider kesintisi, net ödenen), PDF çıktısı alma."
+    },
+    {
+      "name": "Yapay Zeka Destekli Teklif Hazırlama",
+      "description": "Proje ve malzeme parametreleri girilerek AI destekli maliyet tahmini ve otomatik resmi teklif mektubu oluşturma (PDF indirme)."
+    },
+    {
+      "name": "Çek Yönetimi & Vade Takibi",
+      "description": "Alınan/verilen çek kaydı, çek fotoğrafı/görüntüsü yükleme & görüntüleme, vade bazlı otomatik uyarı sistemi (7Gün, 3Gün, Bugün)."
+    },
+    {
+      "name": "Gider Yönetimi & Onay Mekanizması",
+      "description": "Dekont / fiş fotoğrafı yükleme. YÖNETİCİ ONAYI OLMADAN HİÇBİR GİDER ŞANTİYE BAKİYESİNE YANSIMAZ (Onay/Red bekleme paneli)."
+    },
+    {
+      "name": "Yapay Zeka Asistan Paneli",
+      "description": "Risk analizi, bütçe aşım ihtimali tahmini, şantiye verimlilik önerileri ve anlık finansal soru-cevap."
+    },
+    {
+      "name": "Ödeme Takvimi & Hatırlatıcılar",
+      "description": "Kira, kredi kartı, banka kredileri ve çek vadeleri için takvim görünümü ve günlük uyarı kartları."
+    },
+    {
+      "name": "Giriş / Kayıt (JWT Auth)",
+      "description": "Devrantaş Yapı Mimarlık kurumsal giriş portalı, rol bazlı yetkilendirme (Yönetici / Şantiye Şefi / Muhasebe)."
+    }
+  ],
+  "visual_enhancers": {
+    "card_style": "bg-white border border-[#E7E5E4] border-l-4 border-l-[#B8860B] shadow-sm hover:shadow-md transition-all rounded-xl p-5 md:p-6",
+    "glass_morphism": "backdrop-blur-md bg-[#FDFBF7]/80 border border-[#E2D3B4]",
+    "gold_badge": "px-3 py-1 rounded-full text-xs font-mono font-bold bg-[#FAF5E8] text-[#B8860B] border border-[#E2D3B4]",
+    "overhead_notice_tag": "bg-[#FAF5E8] border border-[#E2D3B4] text-[#8B6508] rounded-md px-3 py-1 text-xs font-mono"
+  },
+  "image_urls": {
+    "architecture_hero": "https://images.unsplash.com/photo-1613490493576-7fde63acd811?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzNzl8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBsdXh1cnklMjBhcmNoaXRlY3R1cmUlMjBidWlsZGluZyUyMGV4dGVyaW9yJTIwY29uc3RydWN0aW9ufGVufDB8fHx8MTc5MjYxMzU2OXww&ixlib=rb-4.1.0&q=85",
+    "construction_site_1": "https://images.unsplash.com/photo-1591474200742-8e512e6f98f8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzNzl8MHwxfHNlYXJjaHwyfHxtb2Rlcm4lMjBsdXh1cnklMjBhcmNoaXRlY3R1cmUlMjBidWlsZGluZyUyMGV4dGVyaW9yJTIwY29uc3RydWN0aW9ufGVufDB8fHx8MTc5MjYxMzU2OXww&ixlib=rb-4.1.0&q=85",
+    "building_facade": "https://images.unsplash.com/photo-1670589953882-b94c9cb380f5?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzNzl8MHwxfHNlYXJjaHw0fHxtb2Rlcm4lMjBsdXh1cnklMjBhcmNoaXRlY3R1cmUlMjBidWlsZGluZyUyMGV4dGVyaW9yJTIwY29uc3RydWN0aW9ufGVufDB8fHx8MTc5MjYxMzU2OXww&ixlib=rb-4.1.0&q=85",
+    "sample_receipt": "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?crop=entropy&cs=srgb&fm=jpg&q=85",
+    "sample_check": "https://images.unsplash.com/photo-1580519542036-c47de6196ba5?crop=entropy&cs=srgb&fm=jpg&q=85"
+  },
+  "instructions_to_main_agent": [
+    "Uygulama arka planını krem (krem/cream - #FDFBF7 veya #F5F0E6) tutun.",
+    "Başlıklarda serif lüks font (Cormorant Garamond), gövde yazılarında Manrope ve rakamlarda JetBrains Mono kullanın.",
+    "Altın (Gold #B8860B) rengi rozetlerde, aksan çizgilerinde, aktif butonlarda ve seçili menü öğelerinde kullanın. Gövde metinleri okunaklılık için koyu charcoal (#1C1917 / #57534E) olmalıdır.",
+    "Tüm para birimleri Türk Lirası (₺ / TRY) olarak formatlanmalıdır.",
+    "Şantiye tutarlarından %6 Otomatik Genel Gider kesintisi mantığını hesaplama fonksiyonlarında ve UI kartlarında belirgin şekilde gösterin.",
+    "Gider yönetimi modülünde 'Yönetici Onayı Bekliyor' durumu olmadan giderlerin nihai şantiye kar/zararına eklenmemesini sağlayın.",
+    "Çek ve ödeme takviminde 7 Gün, 3 Gün ve Bugün kalan ödemeler için özel uyarı bannerları ve filtresi oluşturun.",
+    "Hakediş ve Teklif modüllerine jsPDF / html2pdf entegrasyonu ile 'PDF İndir' butonu ekleyin.",
+    "Tüm etkileşimli elementlere data-testid ekleyin (örn: data-testid='add-expense-button', data-testid='approve-expense-item')."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "Always add data-testid attributes to buttons, inputs, links, and card containers.",
+    "Ensure total readability: contrast ratio between text and cream background must exceed WCAG AA standards.",
+    "Do not use default generic Inter headings. Always leverage Cormorant Garamond / Bodoni style serif display headings for Devrantaş Yapı Mimarlık.",
+    "Keep mobile layout completely scrollable without breaking horizontal overflow."
+  ]
+}

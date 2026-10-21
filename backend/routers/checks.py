@@ -1,0 +1,186 @@
+from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel
+from typing import Optional
+from datetime import date, timedelta
+from core import db, get_current_user, new_id, now_iso, today_str
+
+router = APIRouter(tags=["checks"])
+
+REMINDER_OFFSETS = [7, 3, 0]
+
+
+async def create_reminders(source_type: str, source_id: str, title: str, amount: float, due_date: str):
+    await db.reminders.delete_many({"source_id": source_id})
+    due = date.fromisoformat(due_date)
+    docs = []
+    for off in REMINDER_OFFSETS:
+        docs.append({"id": new_id(), "source_type": source_type, "source_id": source_id, "title": title,
+                     "amount": amount, "due_date": due_date, "remind_date": (due - timedelta(days=off)).isoformat(),
+                     "days_before": off, "dismissed": False, "created_at": now_iso()})
+    await db.reminders.insert_many(docs)
+
+
+# ---------- Checks (Çek) ----------
+class CheckIn(BaseModel):
+    direction: str  # alinan | verilen
+    account_id: Optional[str] = None
+    site_id: Optional[str] = None
+    bank: Optional[str] = ""
+    check_no: Optional[str] = ""
+    drawer: Optional[str] = ""
+    amount: float
+    issue_date: Optional[str] = None
+    due_date: str
+    image_file_id: Optional[str] = None
+    notes: Optional[str] = ""
+
+
+async def _enrich_check(c: dict) -> dict:
+    if c.get("account_id"):
+        a = await db.accounts.find_one({"id": c["account_id"]}, {"_id": 0, "name": 1})
+        c["account_name"] = a["name"] if a else None
+    if c.get("site_id"):
+        s = await db.sites.find_one({"id": c["site_id"]}, {"_id": 0, "name": 1})
+        c["site_name"] = s["name"] if s else None
+    c["days_left"] = (date.fromisoformat(c["due_date"]) - date.today()).days
+    return c
+
+
+@router.get("/checks")
+async def list_checks(direction: Optional[str] = None, status: Optional[str] = None, user=Depends(get_current_user)):
+    q = {}
+    if direction: q["direction"] = direction
+    if status: q["status"] = status
+    rows = await db.checks.find(q, {"_id": 0}).sort("due_date", 1).to_list(1000)
+    return [await _enrich_check(c) for c in rows]
+
+
+@router.post("/checks", status_code=201)
+async def create_check(data: CheckIn, user=Depends(get_current_user)):
+    if data.direction not in ("alinan", "verilen"):
+        raise HTTPException(status_code=400, detail="Yön alinan veya verilen olmalı")
+    doc = {"id": new_id(), **data.model_dump(), "status": "portfoyde", "created_at": now_iso(), "created_by": user["id"]}
+    await db.checks.insert_one(doc)
+    doc.pop("_id", None)
+    label = "Alınan Çek" if data.direction == "alinan" else "Verilen Çek"
+    await create_reminders("cek", doc["id"], f"{label} - {data.bank or ''} {data.check_no or ''}".strip(), data.amount, data.due_date)
+    return await _enrich_check(doc)
+
+
+@router.put("/checks/{cid}")
+async def update_check(cid: str, data: CheckIn, user=Depends(get_current_user)):
+    res = await db.checks.update_one({"id": cid}, {"$set": data.model_dump()})
+    if not res.matched_count:
+        raise HTTPException(status_code=404, detail="Çek bulunamadı")
+    label = "Alınan Çek" if data.direction == "alinan" else "Verilen Çek"
+    await create_reminders("cek", cid, f"{label} - {data.bank or ''} {data.check_no or ''}".strip(), data.amount, data.due_date)
+    c = await db.checks.find_one({"id": cid}, {"_id": 0})
+    return await _enrich_check(c)
+
+
+class CheckStatusIn(BaseModel):
+    status: str  # portfoyde | tahsil_edildi | odendi | karsiliksiz | ciro_edildi
+
+
+@router.patch("/checks/{cid}/status")
+async def check_status(cid: str, data: CheckStatusIn, user=Depends(get_current_user)):
+    if data.status not in ("portfoyde", "tahsil_edildi", "odendi", "karsiliksiz", "ciro_edildi"):
+        raise HTTPException(status_code=400, detail="Geçersiz durum")
+    res = await db.checks.update_one({"id": cid}, {"$set": {"status": data.status}})
+    if not res.matched_count:
+        raise HTTPException(status_code=404, detail="Çek bulunamadı")
+    if data.status != "portfoyde":
+        await db.reminders.update_many({"source_id": cid}, {"$set": {"dismissed": True}})
+    return {"ok": True}
+
+
+@router.delete("/checks/{cid}")
+async def delete_check(cid: str, user=Depends(get_current_user)):
+    await db.checks.delete_one({"id": cid})
+    await db.reminders.delete_many({"source_id": cid})
+    return {"ok": True}
+
+
+# ---------- Scheduled payments (Kira / Kart / Kredi) ----------
+class PaymentIn(BaseModel):
+    type: str  # kira | kredi_karti | kredi | diger
+    title: str
+    amount: float
+    due_date: str
+    site_id: Optional[str] = None
+    notes: Optional[str] = ""
+
+
+@router.get("/payments")
+async def list_payments(status: Optional[str] = None, user=Depends(get_current_user)):
+    q = {"status": status} if status else {}
+    rows = await db.payments.find(q, {"_id": 0}).sort("due_date", 1).to_list(1000)
+    for p in rows:
+        p["days_left"] = (date.fromisoformat(p["due_date"]) - date.today()).days
+    return rows
+
+
+@router.post("/payments", status_code=201)
+async def create_payment(data: PaymentIn, user=Depends(get_current_user)):
+    if data.type not in ("kira", "kredi_karti", "kredi", "diger"):
+        raise HTTPException(status_code=400, detail="Geçersiz ödeme tipi")
+    doc = {"id": new_id(), **data.model_dump(), "status": "bekliyor", "created_at": now_iso(), "created_by": user["id"]}
+    await db.payments.insert_one(doc)
+    doc.pop("_id", None)
+    await create_reminders(data.type, doc["id"], data.title, data.amount, data.due_date)
+    doc["days_left"] = (date.fromisoformat(doc["due_date"]) - date.today()).days
+    return doc
+
+
+@router.patch("/payments/{pid}/paid")
+async def pay_payment(pid: str, user=Depends(get_current_user)):
+    res = await db.payments.update_one({"id": pid}, {"$set": {"status": "odendi", "paid_at": now_iso()}})
+    if not res.matched_count:
+        raise HTTPException(status_code=404, detail="Ödeme bulunamadı")
+    await db.reminders.update_many({"source_id": pid}, {"$set": {"dismissed": True}})
+    return {"ok": True}
+
+
+@router.delete("/payments/{pid}")
+async def delete_payment(pid: str, user=Depends(get_current_user)):
+    await db.payments.delete_one({"id": pid})
+    await db.reminders.delete_many({"source_id": pid})
+    return {"ok": True}
+
+
+# ---------- Reminders ----------
+@router.get("/reminders")
+async def list_reminders(user=Depends(get_current_user)):
+    today = today_str()
+    rows = await db.reminders.find({"dismissed": False, "remind_date": {"$lte": today}, "due_date": {"$gte": today}},
+                                   {"_id": 0}).sort("due_date", 1).to_list(500)
+    overdue = await db.reminders.find({"dismissed": False, "due_date": {"$lt": today}, "days_before": 0},
+                                      {"_id": 0}).sort("due_date", 1).to_list(500)
+    latest = {}
+    for r in rows:
+        key = r["source_id"]
+        if key not in latest or r["days_before"] < latest[key]["days_before"]:
+            latest[key] = r
+    buckets = {"today": [], "three_days": [], "seven_days": [], "overdue": overdue}
+    for r in latest.values():
+        days_left = (date.fromisoformat(r["due_date"]) - date.today()).days
+        r["days_left"] = days_left
+        if days_left <= 0:
+            buckets["today"].append(r)
+        elif days_left <= 3:
+            buckets["three_days"].append(r)
+        else:
+            buckets["seven_days"].append(r)
+    for r in overdue:
+        r["days_left"] = (date.fromisoformat(r["due_date"]) - date.today()).days
+    buckets["total"] = sum(len(v) for v in buckets.values())
+    return buckets
+
+
+@router.patch("/reminders/{rid}/dismiss")
+async def dismiss(rid: str, user=Depends(get_current_user)):
+    r = await db.reminders.find_one({"id": rid}, {"_id": 0})
+    if not r:
+        raise HTTPException(status_code=404, detail="Hatırlatıcı bulunamadı")
+    await db.reminders.update_many({"source_id": r["source_id"]}, {"$set": {"dismissed": True}})
+    return {"ok": True}
