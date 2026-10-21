@@ -39,5 +39,7 @@ async def download(file_id: str, user=Depends(get_current_user)):
     except Exception as e:
         logger.error(f"Download failed: {e}")
         raise HTTPException(status_code=502, detail="Dosya alınamadı")
+    from urllib.parse import quote
+    name = rec.get("original_filename") or "dosya"
     return Response(content=data, media_type=rec.get("content_type") or ctype,
-                    headers={"Content-Disposition": f"inline; filename=\"{rec.get('original_filename', 'dosya')}\""})
+                    headers={"Content-Disposition": f"inline; filename=\"{name.encode('ascii', 'ignore').decode() or 'dosya'}\"; filename*=UTF-8''{quote(name)}"})

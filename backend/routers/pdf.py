@@ -99,8 +99,10 @@ def build(story) -> bytes:
 
 
 def pdf_response(data: bytes, filename: str):
+    from urllib.parse import quote
+    ascii_name = filename.encode("ascii", "ignore").decode() or "belge.pdf"
     return Response(content=data, media_type="application/pdf",
-                    headers={"Content-Disposition": f"inline; filename=\"{filename}\""})
+                    headers={"Content-Disposition": f"inline; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(filename)}"})
 
 
 @router.get("/progress-payment/{pid}")

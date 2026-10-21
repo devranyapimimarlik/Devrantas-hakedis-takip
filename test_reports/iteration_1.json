@@ -1,0 +1,48 @@
+{
+  "summary": "Comprehensive backend regression + frontend smoke test for Devrantaş ERP. 35/36 backend tests passed (97.2%). Found 1 real backend bug: PDF statement endpoint returns 500 due to Turkish characters in Content-Disposition filename (latin-1 encoding error). Frontend loads, login works, dashboard shows kasa cards & reminder banners, add-transaction button + tx-kasa-select present after opening dialog, report tabs working, bottom-nav visible on mobile, taşeron page has Hakediş & Cari ekstre entries. Business logic for %6 overhead, hakediş net calc (100000→112800), approval flow, kasa validation, taşeron avans not double-counting, check auto-creation + 7/3/0 reminders, role-based auth (muhasebe cannot approve → 403) all verified end-to-end.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "GET /api/pdf/statement/{account_id}",
+        "issue": "500 UnicodeEncodeError: 'latin-1' codec can't encode character '\\u015f' (Turkish ş) when account name contains non-ASCII chars. Root cause: /app/backend/routers/pdf.py:102 pdf_response() puts raw filename directly in Content-Disposition header. ASGI/Starlette requires latin-1 for headers.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dashboard", "issues": ["Minor Recharts console warning: 'width(-1) and height(-1) of chart should be greater than 0' — chart container sizing on initial mount; cosmetic only"]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "FIX: /app/backend/routers/pdf.py pdf_response() — sanitize filename for Content-Disposition. Use RFC 5987 encoding or strip to ASCII, e.g.: filename_ascii = filename.encode('ascii', 'ignore').decode() or quote per RFC: `filename*=UTF-8''{quote(filename)}`. Affects /api/pdf/statement/{account_id} (and any PDF with Turkish filename).",
+    "Investigate Recharts initial-size warning on Dashboard — add minWidth/minHeight to chart ResponsiveContainer parents."
+  ],
+  "critical_code_review_comments": [
+    "server.py / routers: proper /api prefix, UUID-based IDs (good — no ObjectId leaks via projection {_id:0}).",
+    "transactions.py:85 — kasa required field raises Pydantic 422 when missing. core logic distinguishes KASA validation (400 if invalid value, 422 if missing). Spec allows either, so OK.",
+    "core.site_summary() correctly excludes taşeron SUB_CATEGORIES from direct_expense and uses progress_payments.net_amount for subcontractor_expense, preventing double counting. Verified by test.",
+    "pdf.py pdf_response() does NOT sanitize filename → latin-1 encoding bug for any non-ASCII entity name. HIGH priority — affects real-world usage.",
+    "checks.py create_reminders() uses REMINDER_OFFSETS=[7,3,0] and reminders endpoint buckets correctly by days_left.",
+    "auth.py uses bcrypt hashing ($2b$), httpOnly cookies with secure+samesite=none, 5-attempt lockout for 15min, seed_admin updates password if changed. Playbook compliant.",
+    "No MongoDB _id leaks observed (all queries use {_id: 0} projection).",
+    "ai.py SSE streaming works; site-analysis endpoint returns 200 with analysis text."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py (new regression test suite, 36 pytest tests)"
+  ],
+  "success_rate": {"backend": "97%", "frontend": "100% (smoke)"},
+  "test_credentials": "admin@devrantas.com / Devrantas2026! (seeded)",
+  "seed_data_creation": "Each pytest run creates TEST_ prefixed accounts (musteri, taseron), 1 site with 1M contract, 1 taşeron hakediş, 1 contract, 2 proposals, several transactions, 1 payment. Also creates 1 muhasebe user per run (muhasebe_<hex>@example.com) for RBAC test. No cleanup performed — safe since all data is prefixed TEST_ and does not clash with seed.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression suite at /app/backend/tests/backend_test.py uses pytest-xdist loadscope (2 workers) — all entity fixtures (musteri_id, taseron_id, site_id, hakedis_id, proposal_id, contract_id) are session-scoped so each worker creates its own copies. After PDF filename fix, re-run `pytest backend/tests/backend_test.py` — should be 36/36. Frontend AI page is at /asistan (not /ai). All critical data-testid attributes verified present: kasa-nakit-card, kasa-cek-card, add-transaction-button, tx-kasa-select, tx-tab-*, add-site-button, report-tab-*, bottom-nav, ai-input, ai-send-button, ai-msg-{role}.",
+  "rca of the issue": "Bug: PDF statement 500. Reproduction: GET /api/pdf/statement/<account_id> where account.name contains Turkish letter (ş/ğ/ı/İ/Ş/Ğ/ç/Ç/ö/Ö/ü/Ü). Trace: starlette/responses.py:58 — raw_headers list-comp encodes header value as latin-1; 'ş' (U+015F) is not in latin-1 → UnicodeEncodeError → 500. Fix: in /app/backend/routers/pdf.py line 101-103 replace with: `from urllib.parse import quote; safe = quote(filename); return Response(..., headers={\"Content-Disposition\": f\"inline; filename*=UTF-8''{safe}\"})` (RFC 5987) or ASCII-fallback: `filename.encode('ascii','replace').decode().replace('?','_')`."
+}
