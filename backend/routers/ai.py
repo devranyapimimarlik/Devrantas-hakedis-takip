@@ -5,7 +5,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional
 from emergentintegrations.llm.chat import LlmChat, UserMessage, TextDelta, StreamDone
-from core import db, get_current_user, new_id, now_iso, site_summary, account_balance, OVERHEAD_RATE
+from core import db, get_current_user, new_id, now_iso, site_summary, account_balance
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 MODEL = ("openai", "gpt-6-sol")

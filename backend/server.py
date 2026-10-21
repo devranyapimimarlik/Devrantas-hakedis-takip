@@ -35,6 +35,7 @@ async def startup():
     await auth.seed_admin()
     await db.reminders.create_index([("remind_date", 1), ("dismissed", 1)])
     await db.transactions.create_index([("site_id", 1), ("status", 1)])
+    await db.alert_logs.create_index("run_id", unique=True)
     try:
         init_storage()
         logger.info("Storage initialized")

@@ -1,0 +1,45 @@
+{
+  "summary": "Iteration-2 testing: 34/34 new backend tests passed (100%). Covered: hakediş /pay split flow (nakit+çek, auto 'odendi' after both tx approved, site expense not doubled), validations (taslak/missing due_date/zero amounts -> 400), reports export for all 8 tabs (xlsx+pdf), invalid tab 400, filter export, daily-summary (keys + due_items + customer_risks>33%), cron auth (401 no auth, 401 wrong secret, 200 queued with Bearer+X-Webhook-Id, duplicate detection), alerts/history has twilio_yok, alerts/send 400 (no Twilio), site photo upload+list+delete+site progress update, hakediş PDF still 200 after photos, AI work-catalog returns 19 items. Frontend smoke verified: daily-summary-card + toggle + whatsapp btn on dashboard, Reports export triggers both xlsx/pdf downloads (file saved as rapor-{tab}.{ext}), new hakediş page catalog select auto-fills description+unit from 19-item catalog, hakediş detail progress-pay-button opens pay-form, pay-preset-half fills 56400/56400 and reveals check fields, site-photos-card + add-photo-button + photo-form present on site detail. Iteration-1 PDF Content-Disposition bug confirmed FIXED (pdf.py pdf_response uses RFC5987).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Money (Bits.jsx:34)", "issue": "Money component signature is `function Money({ value, className, signed })` and does NOT forward data-testid prop to the rendered <span>. Result: `data-testid=\"progress-remaining\"` set on <Money/> in ProgressDetail.jsx:69 is silently dropped, so automated tests cannot locate the 'Kalan' amount element.", "selector": "[data-testid='progress-remaining']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Yeni Hakediş (ProgressPayments.jsx:18)", "issues": ["React hydration warning: '<span> cannot be a child of <option>'. The dev-time instrumentation injects a <span data-ve-dynamic> inside <option> tags of the catalog <select>. Likely harmless in production bundle (no instrumentation) but prints repeated console errors in dev."]},
+      {"screen": "Dashboard", "issues": ["Recharts width(-1)/height(-1) warning persists from iteration 1 (minor)."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration2.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/iter2.xml"
+  ],
+  "action_items": [
+    "Forward data-testid in Money component: `export function Money({ value, className, signed=false, ...rest }) { return <span {...rest} className=.../>; }` so progress-remaining and similar testids become addressable.",
+    "(Optional cosmetic) Suppress or ignore the dev-instrumentation span-in-option hydration warning; may require ignoring in dev plugin config.",
+    "(Carried over, not blocking) Add minWidth/minHeight to Dashboard ResponsiveContainer parents to silence Recharts warning."
+  ],
+  "critical_code_review_comments": [
+    "progress.py pay_progress: good — status gating (taslak -> 400), explicit nakit+cek validation, cek_amount requires check_due_date, creates one tx per kasa and attaches progress_payment_id via a separate update_one call (not atomic but acceptable for single-user admin workflow).",
+    "transactions.py approve(): auto-upgrades parent progress_payment to 'odendi' only when hakedis status is 'onaylandi' and sum(approved tx) >= net_amount - 0.01 — correctly handles rounding and prevents re-set of already paid hakediş. Verified.",
+    "site_summary excludes 'Taşeron Hakediş Ödemesi' from direct_expense and uses progress_payments.net_amount for subcontractor_expense — prevents double counting on payment approval. Verified via test_site_expense_not_doubled.",
+    "alerts.py cron/daily-reminders: uses hmac.compare_digest for secret, idempotent via X-Webhook-Id (checks alert_logs.run_id), BackgroundTasks for the actual job. Returns 2xx quickly as required.",
+    "alerts.send_twilio: imports twilio only inside function (correct — avoids startup dependency). twilio_configured() correctly returns False when env vars missing -> /alerts/send 400.",
+    "reports.export_report: tab whitelist via TAB_TITLES, builds subtitle from filters (correctly fetches site/account names), reuses reports() for data — DRY.",
+    "sites.add_photo: updates sites.progress_percent only if provided (not None). Good — avoids overwriting progress when just logging a photo.",
+    "pdf.pdf_response: RFC5987 header fix verified (ascii fallback + filename*=UTF-8''<encoded>). Iteration-1 bug fully resolved.",
+    "Money component (Bits.jsx:34) doesn't accept/forward data-testid — tiny ergonomic bug; a 2-char fix enables testable 'Kalan' amount."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration2.py (new, 34 pytest tests covering all iteration-2 features)"
+  ],
+  "success_rate": {"backend": "100% (34/34)", "frontend": "~95% (all data-testids addressable except progress-remaining)"},
+  "test_credentials": "admin@devrantas.com / Devrantas2026! (seeded). WEBHOOK_CRON_SECRET loaded from /app/backend/.env in tests.",
+  "seed_data_creation": "Each run creates ~2 TEST_ musteri, 2 TEST_ taseron, 2 TEST_ sites, 2 progress payments, 1 approved+paid hakediş (odendi), 1 çek (verilen), 1 çek (alinan due in 2 days), 1 uploaded PNG (and deletes it). All prefixed TEST_ for easy cleanup.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration-2 regression suite at /app/backend/tests/test_iteration2.py (pytest-xdist loadscope compatible). The iteration-1 suite /app/backend/tests/backend_test.py remains the baseline. Both can be run together with `pytest /app/backend/tests/`. Note: `/app/backend/.env` is read directly in iteration-2 tests to pick up WEBHOOK_CRON_SECRET so that pytest subprocess sees it without extra setup. Twilio keys intentionally absent — /alerts/send must return 400, alerts/history must contain 'twilio_yok'. Site detail route is /santiyeler/:id (NOT /santiye/:id).",
+  "rca of the issue": "Minor UI testability issue — /app/frontend/src/components/shared/Bits.jsx line 34: Money component only accepts {value, className, signed}, dropping data-testid passed by callers. In ProgressDetail.jsx:69, `<Money ... data-testid=\"progress-remaining\" />` renders a <span> without the attribute, making the 'Kalan' amount unreachable from Playwright/Cypress by its testid. Fix: spread extra props -> `function Money({value, className, signed=false, ...rest}) { return <span {...rest} className=... />; }`."
+}

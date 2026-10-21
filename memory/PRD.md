@@ -31,9 +31,11 @@
 ## Tamamlananlar (21 Eki 2026)
 - Tüm MVP modülleri + referans tasarım uyarlaması + kasa/karma ödeme/avans mantığı + sözleşme modülü + Excel/PDF çıktıları.
 - Test: testing_agent iteration_1 → backend 36/36 (PDF filename latin-1 hatası düzeltildi), frontend smoke OK.
+- Tur 2: Hakediş ödeme kısayolu (POST /progress-payments/{id}/pay, nakit/çek bölüşüm, otomatik "odendi"), rapor Excel/PDF export (GET /reports/export?tab&format), günlük özet + WhatsApp (routers/alerts.py; cron `.emergent/crons.yml` 09:00 Europe/Istanbul → POST /api/cron/daily-reminders, Bearer WEBHOOK_CRON_SECRET; Twilio opsiyonel: TWILIO_ACCOUNT_SID/AUTH_TOKEN/WHATSAPP_FROM/SMS_FROM, MANAGER_PHONE=+905334825702; zarar riski, müşteri riski >%33, şüpheli kayıt özeti), şantiye fotoğraf günlüğü (/sites/{id}/photos → hakediş PDF'ine eklenir), AI iş kataloğu (ai.py WORK_CATALOG, GET /ai/work-catalog; teklif/maliyet AI sadece katalogdan seçer). Test iteration_2 → 34/34 backend.
+- Code review düzeltmeleri: public /auth/register kaldırıldı (kullanıcılar sadece yönetici tarafından /auth/register-sub ile eklenir), seed_admin artık mevcut şifreyi ezmiyor, ?auth= query token fallback kaldırıldı, müşteri hakedişi tam tahsilatta otomatik "odendi", cron idempotency unique index + claim kaydı. Backend pytest 70/70.
 
 ## Backlog
-- P1: Çek "ciro" ile taşerona ödeme bağlama; hakediş ödemesi butonundan otomatik "Taşeron Hakediş Ödemesi" formu açma.
-- P1: Raporlar için PDF/Excel export (şu an tarayıcı yazdır).
-- P2: Görünüm ayarları (logo/renk), bildirim e-postası/SMS, çoklu para birimi.
-- P2: Recharts ilk mount boyut uyarısı (kozmetik).
+- P1: Twilio anahtarları gelince gerçek WhatsApp/SMS gönderimi (kod hazır; .env doldurulması yeterli).
+- P1: Test verilerinin temizlenmesi (DB'de TEST_ önekli kayıtlar var) — kullanıcı onayı ile.
+- P2: Görünüm ayarları (logo/renk), çoklu para birimi, çek ciro ile taşeron ödemesi bağlama.
+- P2: Recharts ilk mount boyut uyarısı (kozmetik); dashboard/daily-summary N+1 aggregation performansı (büyük veri).

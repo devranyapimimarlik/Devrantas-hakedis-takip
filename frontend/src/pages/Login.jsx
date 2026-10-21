@@ -2,17 +2,16 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { errMsg } from "@/lib/api";
-import { NInput, NSelect, GoldButton } from "@/components/shared/Inputs";
+import { NInput, GoldButton } from "@/components/shared/Inputs";
 import { Field } from "@/components/shared/Bits";
 import { Loader2 } from "lucide-react";
 
 const HERO = "https://images.unsplash.com/photo-1613490493576-7fde63acd811?crop=entropy&cs=srgb&fm=jpg&q=85&w=1600";
 
 export default function Login() {
-  const { login, register } = useAuth();
+  const { login } = useAuth();
   const nav = useNavigate();
-  const [mode, setMode] = useState("login");
-  const [form, setForm] = useState({ email: "", password: "", name: "", role: "muhasebe" });
+  const [form, setForm] = useState({ email: "", password: "" });
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
@@ -21,8 +20,7 @@ export default function Login() {
     e.preventDefault();
     setErr(""); setBusy(true);
     try {
-      if (mode === "login") await login(form.email, form.password);
-      else await register(form);
+      await login(form.email, form.password);
       nav("/");
     } catch (ex) { setErr(errMsg(ex)); } finally { setBusy(false); }
   };
@@ -45,31 +43,16 @@ export default function Login() {
             <div><p className="font-serif text-4xl font-bold text-charcoal leading-none">Devrantaş</p>
             <p className="font-serif text-sm text-gold tracking-[0.3em] uppercase mt-1">Yapı Mimarlık</p></div>
           </div>
-          <h1 className="text-2xl font-serif font-semibold text-charcoal mt-10">{mode === "login" ? "Kurumsal Giriş" : "Yeni Kullanıcı Kaydı"}</h1>
-          <p className="text-sm text-charcoal-light mt-1">{mode === "login" ? "Hesabınızla devam edin." : "Ekip üyesi hesabı oluşturun."}</p>
+          <h1 className="text-2xl font-serif font-semibold text-charcoal mt-10">Kurumsal Giriş</h1>
+          <p className="text-sm text-charcoal-light mt-1">Hesabınızla devam edin. Yeni kullanıcılar yönetici tarafından tanımlanır.</p>
           <form onSubmit={submit} className="mt-8 space-y-4" data-testid="auth-form">
-            {mode === "register" && (
-              <>
-                <Field label="Ad Soyad"><NInput value={form.name} onChange={set("name")} required data-testid="register-name-input" /></Field>
-                <Field label="Rol">
-                  <NSelect value={form.role} onChange={set("role")} data-testid="register-role-select">
-                    <option value="muhasebe">Muhasebe</option>
-                    <option value="santiye_sefi">Şantiye Şefi</option>
-                    <option value="yonetici">Yönetici</option>
-                  </NSelect>
-                </Field>
-              </>
-            )}
             <Field label="E-posta"><NInput type="email" value={form.email} onChange={set("email")} required autoComplete="email" data-testid="login-email-input" /></Field>
             <Field label="Şifre"><NInput type="password" value={form.password} onChange={set("password")} required autoComplete="current-password" data-testid="login-password-input" /></Field>
             {err && <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2" data-testid="auth-error">{err}</p>}
             <GoldButton type="submit" disabled={busy} className="w-full" data-testid="login-submit-button">
-              {busy && <Loader2 className="w-4 h-4 animate-spin" />}{mode === "login" ? "Giriş Yap" : "Kayıt Ol"}
+              {busy && <Loader2 className="w-4 h-4 animate-spin" />}Giriş Yap
             </GoldButton>
           </form>
-          <button type="button" onClick={() => { setMode(mode === "login" ? "register" : "login"); setErr(""); }} className="mt-6 text-sm text-charcoal-light hover:text-gold" data-testid="toggle-auth-mode">
-            {mode === "login" ? "Hesabınız yok mu? Kayıt olun" : "Zaten hesabınız var mı? Giriş yapın"}
-          </button>
         </div>
       </div>
     </div>

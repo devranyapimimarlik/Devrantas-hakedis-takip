@@ -27,20 +27,6 @@ def _auth_response(response: Response, user: dict) -> dict:
     return {"user": public_user(user), "access_token": access}
 
 
-@router.post("/register")
-async def register(data: RegisterIn, response: Response):
-    email = data.email.lower().strip()
-    if await db.users.find_one({"email": email}):
-        raise HTTPException(status_code=400, detail="Bu e-posta adresi zaten kayıtlı")
-    if len(data.password) < 6:
-        raise HTTPException(status_code=400, detail="Şifre en az 6 karakter olmalı")
-    role = data.role if data.role in ROLES else "muhasebe"
-    user = {"id": new_id(), "email": email, "name": data.name.strip(), "role": role,
-            "password_hash": hash_password(data.password), "created_at": now_iso()}
-    await db.users.insert_one(user)
-    return _auth_response(response, user)
-
-
 @router.post("/register-sub", status_code=201)
 async def register_sub(data: RegisterIn, user: dict = Depends(require_role("yonetici"))):
     email = data.email.lower().strip()
@@ -130,13 +116,10 @@ async def set_role(user_id: str, data: RoleIn, user: dict = Depends(require_role
 
 
 async def seed_admin():
-    email = os.environ.get("ADMIN_EMAIL", "admin@devrantas.com").lower()
-    password = os.environ.get("ADMIN_PASSWORD", "Devrantas2026!")
-    existing = await db.users.find_one({"email": email})
-    if not existing:
+    email = os.environ["ADMIN_EMAIL"].lower()
+    password = os.environ["ADMIN_PASSWORD"]
+    if not await db.users.find_one({"email": email}):
         await db.users.insert_one({"id": new_id(), "email": email, "name": "Yönetici", "role": "yonetici",
                                    "password_hash": hash_password(password), "created_at": now_iso()})
-    elif not verify_password(password, existing["password_hash"]):
-        await db.users.update_one({"email": email}, {"$set": {"password_hash": hash_password(password)}})
     await db.users.create_index("email", unique=True)
     await db.login_attempts.create_index("identifier")

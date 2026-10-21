@@ -162,7 +162,18 @@ async def pay_progress(pid: str, data: PayIn, user=Depends(get_current_user)):
         await db.transactions.update_one({"id": doc["id"]}, {"$set": {"progress_payment_id": pid}})
         doc["progress_payment_id"] = pid
         created.append(doc)
+    await close_if_paid(pid)
     return {"created": created, **(await progress_payments_list(pid, user))}
+
+
+async def close_if_paid(pid: str):
+    h = await db.progress_payments.find_one({"id": pid}, {"_id": 0, "net_amount": 1, "status": 1})
+    if not h or h["status"] != "onaylandi":
+        return
+    agg = await db.transactions.aggregate([{"$match": {"progress_payment_id": pid, "status": "onaylandi"}},
+                                           {"$group": {"_id": None, "t": {"$sum": "$amount"}}}]).to_list(1)
+    if agg and agg[0]["t"] >= h["net_amount"] - 0.01:
+        await db.progress_payments.update_one({"id": pid}, {"$set": {"status": "odendi", "status_changed_at": now_iso()}})
 
 
 @router.get("/{pid}/excel")

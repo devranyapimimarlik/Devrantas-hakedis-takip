@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from typing import Optional
 from datetime import date
-from core import db, get_current_user, site_summary, account_balance, r2, OVERHEAD_RATE, SUB_CATEGORIES
+from core import db, get_current_user, site_summary, account_balance, r2, SUB_CATEGORIES
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 

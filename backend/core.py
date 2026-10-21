@@ -79,8 +79,6 @@ async def get_current_user(request: Request) -> dict:
     if not token:
         token = request.cookies.get("access_token")
     if not token:
-        token = request.query_params.get("auth")
-    if not token:
         raise HTTPException(status_code=401, detail="Oturum açılmamış")
     try:
         payload = jwt.decode(token, os.environ["JWT_SECRET"], algorithms=[JWT_ALGORITHM])

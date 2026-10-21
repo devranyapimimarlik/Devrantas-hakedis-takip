@@ -31,10 +31,10 @@ export function StatCard({ label, value, hint, icon: Icon, tone = "gold", testId
   );
 }
 
-export function Money({ value, className, signed = false }) {
+export function Money({ value, className, signed = false, ...rest }) {
   const n = Number(value || 0);
   return (
-    <span className={cn("money", signed && (n < 0 ? "text-red-700" : "text-emerald-700"), className)}>
+    <span {...rest} className={cn("money", signed && (n < 0 ? "text-red-700" : "text-emerald-700"), className)}>
       {signed && n > 0 ? "+" : ""}{fmtTL(n)}
     </span>
   );

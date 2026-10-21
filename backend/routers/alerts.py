@@ -4,6 +4,7 @@ import logging
 from datetime import date, datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
 from pydantic import BaseModel
+from pymongo.errors import DuplicateKeyError
 from typing import Optional
 from core import db, get_current_user, require_role, new_id, now_iso, site_summary, account_balance, r2
 
@@ -144,8 +145,8 @@ async def run_daily_job(run_id: str):
             status, detail = "hata", str(e)
     else:
         status = "twilio_yok"
-    await db.alert_logs.insert_one({"id": new_id(), "run_id": run_id, "date": summary["date"], "message": summary["message"],
-                                    "alert_count": summary["alert_count"], "status": status, "detail": detail, "to": to, "created_at": now_iso()})
+    await db.alert_logs.update_one({"run_id": run_id}, {"$set": {"date": summary["date"], "message": summary["message"],
+                                   "alert_count": summary["alert_count"], "status": status, "detail": detail, "to": to, "finished_at": now_iso()}})
 
 
 @router.get("/alerts/daily-summary")
@@ -193,7 +194,10 @@ async def cron_daily(request: Request, background: BackgroundTasks):
     except Exception:
         body = {}
     run_id = request.headers.get("X-Webhook-Id") or (body or {}).get("run_id") or new_id()
-    if await db.alert_logs.find_one({"run_id": run_id}):
+    try:
+        await db.alert_logs.insert_one({"id": new_id(), "run_id": run_id, "status": "kuyrukta", "date": date.today().isoformat(),
+                                        "message": "", "alert_count": 0, "created_at": now_iso()})
+    except DuplicateKeyError:
         return {"ok": True, "duplicate": True}
     background.add_task(run_daily_job, run_id)
     return {"ok": True, "queued": True, "run_id": run_id}
