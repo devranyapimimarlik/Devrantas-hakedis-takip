@@ -15,6 +15,31 @@ SYSTEM = ("Sen Devrantaş Yapı Mimarlık şirketinin finans ve şantiye yöneti
           "kesintisi yapılır. Giderler yönetici onayı olmadan şantiye bakiyesine yansımaz. Verilen finansal verilere dayanarak "
           "somut, sayısal ve uygulanabilir öneriler sun. Markdown başlıklar ve maddeler kullanabilirsin.")
 
+WORK_CATALOG = [
+    {"name": "Sıva (malzeme + işçilik dahil)", "unit": "m²"},
+    {"name": "Alçı sıva (malzeme + işçilik dahil)", "unit": "m²"},
+    {"name": "Kara sıva (malzeme + işçilik dahil)", "unit": "m²"},
+    {"name": "Saten alçı + boya (malzeme + işçilik dahil)", "unit": "m²"},
+    {"name": "Mantolama – EPS malzemeli, dekoratif boya ve iskele dahil", "unit": "m²"},
+    {"name": "Taş yünü mantolama 5 cm (macun hariç)", "unit": "m²"},
+    {"name": "Alçıpan (malzemeli)", "unit": "m²"},
+    {"name": "Alçıpan LED detayı / gizli ışık bandı (malzemeli)", "unit": "mt"},
+    {"name": "Beyaz stropiyer (malzemeli)", "unit": "mt"},
+    {"name": "Kaba sıva – dış cephe, iskele ve malzeme dahil", "unit": "m²"},
+    {"name": "Söve uygulaması", "unit": "mt"},
+    {"name": "Fuga (derz) uygulaması", "unit": "mt"},
+    {"name": "Kat silmesi", "unit": "mt"},
+    {"name": "Banyo sıvası", "unit": "m²"},
+    {"name": "Şap", "unit": "m²"},
+    {"name": "Fileli sıva", "unit": "m²"},
+    {"name": "Dekoratif boya uygulaması", "unit": "m²"},
+    {"name": "Dış cephe seramik kaplama", "unit": "m²"},
+    {"name": "İç cephe boya (malzeme + işçilik dahil)", "unit": "m²"},
+]
+CATALOG_TXT = "\n".join(f"- {w['name']} ({w['unit']})" for w in WORK_CATALOG)
+CATALOG_RULE = ("Devrantaş SADECE şu işleri yapar; teklif ve maliyet kalemlerini yalnızca bu katalogdan seç, katalog dışı imalat (betonarme, elektrik, tesisat, "
+                "çatı, doğrama vb.) ASLA ekleme:\n" + CATALOG_TXT + "\n")
+
 
 def _chat(session_id: str, system: str = SYSTEM) -> LlmChat:
     return LlmChat(api_key=os.environ["EMERGENT_LLM_KEY"], session_id=session_id, system_message=system).with_model(*MODEL)
@@ -143,10 +168,15 @@ class ProposalGenIn(BaseModel):
     items: Optional[list] = []
 
 
+@router.get("/work-catalog")
+async def work_catalog(user=Depends(get_current_user)):
+    return WORK_CATALOG
+
+
 @router.post("/proposal-text")
 async def proposal_text(data: ProposalGenIn, user=Depends(get_current_user)):
     items_txt = "\n".join(f"- {i.get('description')}: {i.get('quantity')} {i.get('unit')} x {fmt(i.get('unit_price'))}" for i in (data.items or []))
-    prompt = (f"Devrantaş Yapı Mimarlık adına resmi bir teklif mektubu metni hazırla.\nMüşteri: {data.customer_name or 'Sayın Yetkili'}\n"
+    prompt = (CATALOG_RULE + f"\nDevrantaş Yapı Mimarlık adına resmi bir teklif mektubu metni hazırla.\nMüşteri: {data.customer_name or 'Sayın Yetkili'}\n"
               f"Proje: {data.title}\nTür: {data.project_type}\nKonum: {data.location}\nAlan: {data.area_m2} m²\nEk bilgi: {data.details}\n"
               f"Kalemler:\n{items_txt or '(kalem girilmedi - alan ve türe göre tahmini kalem ve birim fiyat öner)'}\n\n"
               "Çıktı: 1) Kısa giriş paragrafı, 2) İşin kapsamı maddeleri, 3) Eğer kalem yoksa tahmini maliyet tablosu (madde, miktar, birim fiyat, toplam), "
@@ -157,10 +187,10 @@ async def proposal_text(data: ProposalGenIn, user=Depends(get_current_user)):
 
 @router.post("/cost-estimate")
 async def cost_estimate(data: ProposalGenIn, user=Depends(get_current_user)):
-    prompt = (f"Türkiye 2026 piyasa koşullarında {data.project_type or 'inşaat'} projesi için maliyet tahmini yap. Alan {data.area_m2} m², konum {data.location}. "
+    prompt = (CATALOG_RULE + f"\nTürkiye 2026 piyasa koşullarında '{data.title}' ({data.project_type or 'cephe/iç mekan'}) işi için maliyet tahmini yap. Alan {data.area_m2} m², konum {data.location}. "
               f"Ek bilgi: {data.details}. SADECE geçerli JSON döndür, başka metin yazma. Format: "
               '{"items":[{"description":"...","unit":"m²","quantity":0,"unit_price":0}], "summary":"kısa açıklama"}. '
-              "6-12 kalem üret, miktar ve birim fiyatları gerçekçi TL olsun.")
+              "description alanı katalogdaki isimle birebir aynı olsun. İşe uygun 3-10 kalem seç, miktar ve birim fiyatları (malzeme+işçilik dahil) gerçekçi TL olsun.")
     text = await _generate(prompt, "cost")
     try:
         start, end = text.find("{"), text.rfind("}")

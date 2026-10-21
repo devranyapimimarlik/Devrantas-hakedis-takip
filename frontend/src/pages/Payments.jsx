@@ -7,6 +7,7 @@ import { NInput, NSelect, NTextarea, GoldButton } from "@/components/shared/Inpu
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Plus, Trash2, Check, AlertTriangle, Clock, CalendarClock, BellOff } from "lucide-react";
+import { DailySummaryCard } from "@/components/shared/DailySummary";
 
 export function ReminderBanners({ compact = false }) {
   const qc = useQueryClient();
@@ -68,6 +69,7 @@ export default function Payments() {
   return (
     <div data-testid="payments-page">
       <PageHeader title="Ödeme Takvimi" subtitle={`Kira, kredi kartı, kredi ve çek vadeleri · Bekleyen ${fmtTL(pending.reduce((s, p) => s + p.amount, 0))}`} actions={<GoldButton onClick={() => setOpen(true)} data-testid="add-payment-button"><Plus className="w-4 h-4" /> Sabit Gider Planla</GoldButton>} />
+      <DailySummaryCard />
       <ReminderBanners />
       <h2 className="text-xl font-semibold mb-3">Planlanan Ödemeler</h2>
       {pending.length === 0 ? <EmptyState title="Planlanan ödeme yok" testId="payments-empty" /> : (

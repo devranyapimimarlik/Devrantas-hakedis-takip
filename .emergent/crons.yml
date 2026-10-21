@@ -1,0 +1,9 @@
+crons:
+  - name: daily-reminders
+    description: "Her sabah 09:00 (TR) vadesi yaklaşan çek/ödeme, zarar ve müşteri riski özetini yöneticiye WhatsApp/SMS ile gönderir"
+    cron: "0 9 * * *"
+    timezone: "Europe/Istanbul"
+    endpoint: "{{BASE_URL}}/api/cron/daily-reminders"
+    method: POST
+    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
+    enabled: true

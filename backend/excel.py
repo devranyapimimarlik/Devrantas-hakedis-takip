@@ -13,6 +13,10 @@ BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
 MONEY = '#,##0.00 "₺"'
 
 
+def safe_title(t: str) -> str:
+    return "".join("-" if ch in '\\/*?:[]' else ch for ch in t)[:28]
+
+
 def _w(ws, row, col, val, bold=False, size=10, color="1C1917", fill=None, align=None, fmt=None, border=False):
     c = ws.cell(row=row, column=col, value=val)
     c.font = Font(bold=bold, size=size, color=color, name="Arial")
@@ -23,8 +27,36 @@ def _w(ws, row, col, val, bold=False, size=10, color="1C1917", fill=None, align=
     return c
 
 
+def build_table(title: str, subtitle: str, columns: list, rows: list, summary: list = None) -> bytes:
+    wb = Workbook(); ws = wb.active; ws.title = safe_title(title)
+    widths = [max(14, min(50, len(str(c)) + 6)) for c in columns]
+    for i, w in enumerate(widths, 1):
+        ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w if i > 1 else max(w, 30)
+    img = XLImage(str(LOGO)); img.width = img.height = 70
+    ws.add_image(img, "A1")
+    for rr in (1, 2, 3, 4): ws.row_dimensions[rr].height = 16 if rr > 1 else 28
+    _w(ws, 1, 2, COMPANY["name"], bold=True, size=14, color=GOLD)
+    _w(ws, 2, 2, COMPANY["address"], size=9, color="57534E"); _w(ws, 3, 2, COMPANY["phone"], size=9, color="57534E"); _w(ws, 4, 2, COMPANY["email"], size=9, color="57534E")
+    _w(ws, 6, 1, title, bold=True, size=16, color=GOLD); _w(ws, 7, 1, subtitle, size=9, color="57534E")
+    r = 9
+    if summary:
+        for k, v in summary:
+            _w(ws, r, 1, k, bold=True, color=GOLD, size=9); _w(ws, r, 2, v, fmt=MONEY if isinstance(v, (int, float)) else None, align="left"); r += 1
+        r += 1
+    for i, h in enumerate(columns, 1):
+        _w(ws, r, i, h, bold=True, fill="FAF5E8", border=True)
+    r += 1
+    for row in rows:
+        for i, v in enumerate(row, 1):
+            _w(ws, r, i, v, border=True, fmt=MONEY if isinstance(v, (int, float)) and not isinstance(v, bool) else None, align="right" if isinstance(v, (int, float)) else "left")
+        r += 1
+    ws.page_setup.orientation = "landscape"; ws.page_setup.fitToWidth = 1; ws.sheet_properties.pageSetUpPr.fitToPage = True
+    buf = BytesIO(); wb.save(buf)
+    return buf.getvalue()
+
+
 def build_document(title: str, meta: list, items: list, totals: list, sections: list, signatures=("Müşteri Onayı", "DEVRANTAŞ YAPI MİMARLIK\nKaşe / İmza")) -> bytes:
-    wb = Workbook(); ws = wb.active; ws.title = title[:28]
+    wb = Workbook(); ws = wb.active; ws.title = safe_title(title)
     for col, w in zip("ABCDEF", [6, 48, 12, 14, 18, 20]):
         ws.column_dimensions[col].width = w
     img = XLImage(str(LOGO)); img.width = img.height = 70

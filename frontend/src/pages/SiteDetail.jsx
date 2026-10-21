@@ -7,6 +7,7 @@ import { PageHeader, StatCard, StatusBadge, EmptyState, Money, OverheadTag, Sect
 import { GoldButton } from "@/components/shared/Inputs";
 import { SiteForm } from "@/pages/Sites";
 import { TransactionForm } from "@/pages/Transactions";
+import { SitePhotos } from "@/components/shared/SitePhotos";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { ArrowLeft, Pencil, Plus, Sparkles, Loader2, AlertTriangle } from "lucide-react";
@@ -60,6 +61,7 @@ export default function SiteDetail() {
           </div>
         </div>
       </div>
+      <div className="mt-6"><SitePhotos siteId={id} /></div>
       <Dialog open={edit} onOpenChange={setEdit}><DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle className="font-serif text-2xl">Şantiyeyi Düzenle</DialogTitle></DialogHeader><SiteForm initial={s} onDone={() => setEdit(false)} /></DialogContent></Dialog>
       <Dialog open={addTx} onOpenChange={setAddTx}><DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle className="font-serif text-2xl">Gelir / Gider Ekle</DialogTitle></DialogHeader><TransactionForm defaults={{ site_id: id }} onDone={() => setAddTx(false)} /></DialogContent></Dialog>
     </div>

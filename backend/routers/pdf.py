@@ -98,6 +98,39 @@ def build(story) -> bytes:
     return buf.getvalue()
 
 
+def report_pdf(title: str, subtitle: str, cols: list, rows: list, summary=None):
+    from reportlab.lib.pagesizes import landscape
+    story = []
+    header(story, title, "-", __import__("datetime").date.today().isoformat(), company="DEVRANTAŞ YAPI MİMARLIK İNŞAAT LTD. ŞTİ.")
+    story += [Paragraph(subtitle, S_SUB), Spacer(1, 4 * mm)]
+    if summary:
+        info_table(story, [(k, tl(v) if isinstance(v, (int, float)) else v) for k, v in summary])
+    data = [[Paragraph(str(c), S_CELL_B) for c in cols]]
+    for r in rows:
+        data.append([Paragraph(tl(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and cols[i] not in ("Marj %", "İlerleme %", "Hakediş Sayısı") else str(v if v is not None else ""), S_CELL) for i, v in enumerate(r)])
+    avail = 257 * mm
+    first = 0.28 if len(cols) > 4 else 0.4
+    widths = [avail * first] + [avail * (1 - first) / (len(cols) - 1)] * (len(cols) - 1) if len(cols) > 1 else [avail]
+    t = Table(data, colWidths=widths, repeatRows=1)
+    t.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), CREAM), ("LINEBELOW", (0, 0), (-1, 0), 0.8, GOLD),
+                           ("GRID", (0, 1), (-1, -1), 0.3, colors.HexColor("#E7E5E4")), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                           ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3)]))
+    story.append(t)
+    buf = BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=landscape(A4), leftMargin=20 * mm, rightMargin=20 * mm, topMargin=15 * mm, bottomMargin=26 * mm)
+    doc.build(story, onFirstPage=footer_land, onLaterPages=footer_land)
+    return pdf_response(buf.getvalue(), f"{title}.pdf")
+
+
+def footer_land(canvas, doc):
+    canvas.saveState()
+    canvas.setFillColor(MUTED); canvas.setFont("DejaVu", 7.5)
+    canvas.drawCentredString(148 * mm, 12 * mm, f"{COMPANY['name']} • {COMPANY['address']} • {COMPANY['phone']} • {COMPANY['email']}")
+    canvas.drawRightString(277 * mm, 12 * mm, f"Sayfa {doc.page}")
+    canvas.setStrokeColor(GOLD); canvas.line(20 * mm, 17 * mm, 277 * mm, 17 * mm)
+    canvas.restoreState()
+
+
 def pdf_response(data: bytes, filename: str):
     from urllib.parse import quote
     ascii_name = filename.encode("ascii", "ignore").decode() or "belge.pdf"
@@ -143,7 +176,46 @@ async def progress_pdf(pid: str, user=Depends(get_current_user)):
                 colWidths=[56 * mm, 56 * mm, 56 * mm])
     sig.setStyle(TableStyle([("LINEABOVE", (0, 0), (-1, 0), 0.5, MUTED), ("TOPPADDING", (0, 0), (-1, -1), 4)]))
     story.append(sig)
+    await append_site_photos(story, h)
     return pdf_response(build(story), f"hakedis-{h['number']}.pdf")
+
+
+async def append_site_photos(story, h: dict):
+    from core import get_object
+    from reportlab.platypus import PageBreak
+    prev = await db.progress_payments.find_one({"site_id": h["site_id"], "account_id": h["account_id"], "number": h["number"] - 1}, {"_id": 0, "date": 1})
+    q = {"site_id": h["site_id"], "date": {"$lte": h["date"]}}
+    if prev:
+        q["date"]["$gt"] = prev["date"]
+    photos = await db.site_photos.find(q, {"_id": 0}).sort("date", -1).to_list(6)
+    if not photos:
+        photos = await db.site_photos.find({"site_id": h["site_id"]}, {"_id": 0}).sort("date", -1).to_list(4)
+    if not photos:
+        return
+    cells, row = [], []
+    for p in photos:
+        rec = await db.files.find_one({"id": p["file_id"], "is_deleted": False}, {"_id": 0})
+        if not rec or not (rec.get("content_type") or "").startswith("image/"):
+            continue
+        try:
+            data, _ = get_object(rec["storage_path"])
+            img = Image(BytesIO(data))
+            ratio = img.imageWidth / float(img.imageHeight or 1)
+            img.drawWidth, img.drawHeight = (80 * mm, 80 * mm / ratio) if ratio >= 1 else (60 * mm * ratio, 60 * mm)
+        except Exception:
+            continue
+        cap = Paragraph(f"{p['date']}" + (f" · %{p['progress_percent']:g}" if p.get("progress_percent") is not None else "") + (f"<br/>{p['note']}" if p.get("note") else ""), S_CELL)
+        row.append([img, cap])
+        if len(row) == 2:
+            cells.append(row); row = []
+    if row:
+        row.append(""); cells.append(row)
+    if not cells:
+        return
+    story += [PageBreak(), Paragraph("Şantiye Fotoğraf Günlüğü", S_H), Paragraph("Hakediş dönemine ait ilerleme fotoğrafları", S_SUB), Spacer(1, 4 * mm)]
+    t = Table([[Table([[c[0]], [c[1]]], colWidths=[82 * mm]) if c else "" for c in r] for r in cells], colWidths=[85 * mm, 85 * mm])
+    t.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("BOTTOMPADDING", (0, 0), (-1, -1), 8)]))
+    story.append(t)
 
 
 @router.get("/proposal/{pid}")

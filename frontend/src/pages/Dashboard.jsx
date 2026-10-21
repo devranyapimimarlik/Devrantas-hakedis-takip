@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { fmtTL, fmtDate } from "@/lib/format";
 import { PageHeader, StatCard, Money, StatusBadge, SectionTitle, EmptyState } from "@/components/shared/Bits";
 import { ReminderBanners } from "@/pages/Payments";
+import { DailySummaryCard } from "@/components/shared/DailySummary";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { Wallet, TrendingUp, TrendingDown, Percent, Building2, ClipboardCheck, Banknote } from "lucide-react";
 
@@ -17,6 +18,7 @@ export default function Dashboard() {
     <div data-testid="dashboard-page">
       <PageHeader eyebrow="Genel Bakış" title="Finansal Durum" subtitle={`${data.active_sites} aktif şantiye · Toplam ${data.site_count} proje · Bugün ${fmtDate(data.today)}`} />
       <ReminderBanners compact />
+      <DailySummaryCard compact />
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
         <StatCard label="Toplam Sözleşme" value={fmtTL(t.contract)} hint={`%6 Genel Gider: ${fmtTL(t.overhead)}`} icon={Wallet} testId="stat-contract" />
         <StatCard label="Toplam Tahsilat" value={fmtTL(t.income)} tone="green" icon={TrendingUp} testId="stat-income" delay={60} />

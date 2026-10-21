@@ -61,3 +61,33 @@ async def update_site(site_id: str, data: SiteIn, user=Depends(get_current_user)
 async def delete_site(site_id: str, user=Depends(get_current_user)):
     await db.sites.delete_one({"id": site_id})
     return {"ok": True}
+
+
+class PhotoIn(BaseModel):
+    file_id: str
+    date: str
+    note: Optional[str] = ""
+    progress_percent: Optional[float] = None
+
+
+@router.get("/{site_id}/photos")
+async def list_photos(site_id: str, user=Depends(get_current_user)):
+    return await db.site_photos.find({"site_id": site_id}, {"_id": 0}).sort([("date", -1), ("created_at", -1)]).to_list(500)
+
+
+@router.post("/{site_id}/photos", status_code=201)
+async def add_photo(site_id: str, data: PhotoIn, user=Depends(get_current_user)):
+    if not await db.sites.find_one({"id": site_id}):
+        raise HTTPException(status_code=404, detail="Şantiye bulunamadı")
+    doc = {"id": new_id(), "site_id": site_id, **data.model_dump(), "created_by": user["id"], "created_by_name": user["name"], "created_at": now_iso()}
+    await db.site_photos.insert_one(doc)
+    doc.pop("_id", None)
+    if data.progress_percent is not None:
+        await db.sites.update_one({"id": site_id}, {"$set": {"progress_percent": data.progress_percent}})
+    return doc
+
+
+@router.delete("/{site_id}/photos/{photo_id}")
+async def delete_photo(site_id: str, photo_id: str, user=Depends(get_current_user)):
+    await db.site_photos.delete_one({"id": photo_id, "site_id": site_id})
+    return {"ok": True}

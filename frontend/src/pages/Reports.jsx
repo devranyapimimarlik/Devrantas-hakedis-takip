@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { api, errMsg } from "@/lib/api";
+import { api, errMsg, openPdf, downloadFile } from "@/lib/api";
 import { fmtTL, fmtDate, STATUS_LABELS } from "@/lib/format";
 import { PageHeader, EmptyState, Field, Money, StatusBadge } from "@/components/shared/Bits";
 import { NInput, NSelect, GoldButton, Chip } from "@/components/shared/Inputs";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { toast } from "sonner";
-import { Sparkles, Loader2, Printer } from "lucide-react";
+import { Sparkles, Loader2, Printer, FileDown } from "lucide-react";
 
 const TABS = [["kasa", "Kasa"], ["musteri_risk", "Müşteri Risk"], ["cek", "Çek"], ["odeme", "Ödeme"], ["tahsilat", "Tahsilat"], ["kar_zarar", "Kâr / Zarar"], ["taseron", "Taşeron"], ["para_akisi", "Para Akışı"], ["ai", "AI Analizi"]];
 
@@ -45,10 +45,18 @@ export default function Reports() {
   const { data, isLoading } = useQuery({ queryKey: ["reports", filt], queryFn: () => api.get("/reports", { params: Object.fromEntries(Object.entries(filt).filter(([, v]) => v)) }).then((r) => r.data) });
   const ai = useMutation({ mutationFn: () => api.post("/ai/financial-analysis"), onError: (e) => toast.error(errMsg(e)) });
   const set = (k) => (e) => setFilt({ ...filt, [k]: e.target.value });
+  const exportReport = async (format) => {
+    const q = new URLSearchParams({ tab, format, ...Object.fromEntries(Object.entries(filt).filter(([, v]) => v)) }).toString();
+    try { if (format === "pdf") await openPdf(`/reports/export?${q}`, `rapor-${tab}.pdf`); else await downloadFile(`/reports/export?${q}`, `rapor-${tab}.xlsx`); }
+    catch (e) { toast.error(errMsg(e)); }
+  };
 
   return (
     <div data-testid="reports-page">
-      <PageHeader title="Raporlar" actions={<GoldButton variant="outline" onClick={() => window.print()} data-testid="reports-print-button"><Printer className="w-4 h-4" /> Yazdır / PDF</GoldButton>} />
+      <PageHeader title="Raporlar" actions={<>
+        {tab !== "ai" && <GoldButton variant="outline" onClick={() => exportReport("xlsx")} data-testid="report-excel-button"><FileDown className="w-4 h-4" /> Excel</GoldButton>}
+        {tab !== "ai" && <GoldButton variant="outline" onClick={() => exportReport("pdf")} data-testid="report-pdf-button"><FileDown className="w-4 h-4" /> PDF</GoldButton>}
+        <GoldButton variant="outline" onClick={() => window.print()} data-testid="reports-print-button"><Printer className="w-4 h-4" /> Yazdır</GoldButton></>} />
       <div className="gold-card p-4 mb-5 grid grid-cols-2 lg:grid-cols-4 gap-3 print:hidden" data-testid="reports-filters">
         <Field label="Başlangıç"><NInput type="date" value={filt.start} onChange={set("start")} data-testid="report-start-input" /></Field>
         <Field label="Bitiş"><NInput type="date" value={filt.end} onChange={set("end")} data-testid="report-end-input" /></Field>

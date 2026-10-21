@@ -9,10 +9,13 @@ import { toast } from "sonner";
 import { Plus, Trash2, ArrowLeft } from "lucide-react";
 
 export function ItemsEditor({ items, onChange, testId = "items" }) {
+  const { data: catalog = [] } = useQuery({ queryKey: ["work-catalog"], queryFn: () => api.get("/ai/work-catalog").then((r) => r.data) });
   const upd = (i, k, v) => onChange(items.map((it, idx) => (idx === i ? { ...it, [k]: v } : it)));
   const total = items.reduce((s, it) => s + Number(it.quantity || 0) * Number(it.unit_price || 0), 0);
+  const addFromCatalog = (name) => { const w = catalog.find((c) => c.name === name); if (!w) return; const empty = items.findIndex((it) => !it.description); const row = { description: w.name, unit: w.unit, quantity: "", unit_price: "" }; onChange(empty >= 0 ? items.map((it, i) => (i === empty ? row : it)) : [...items, row]); };
   return (
     <div>
+      {catalog.length > 0 && <div className="mb-3 flex items-center gap-2"><NSelect value="" onChange={(e) => addFromCatalog(e.target.value)} className="!h-10" data-testid={`${testId}-catalog-select`}><option value="">+ Devrantaş iş kataloğundan kalem ekle…</option>{catalog.map((c) => <option key={c.name} value={c.name}>{c.name} ({c.unit})</option>)}</NSelect></div>}
       <div className="overflow-x-auto -mx-1">
         <table className="w-full text-sm min-w-[560px]" data-testid={`${testId}-table`}>
           <thead><tr className="bg-[#F1E8D6] text-left text-charcoal"><th className="p-2 rounded-l-lg font-semibold">İşin cinsi</th><th className="p-2 font-semibold w-24">Birim</th><th className="p-2 font-semibold w-32">Birim fiyat</th><th className="p-2 font-semibold w-24">Miktar</th><th className="p-2 font-semibold text-right w-32">Toplam</th><th className="p-2 rounded-r-lg w-8"></th></tr></thead>

@@ -93,6 +93,7 @@ async def create_transaction(data: TransactionIn, user=Depends(get_current_user)
     if data.type == "gelir":
         doc["approved_by"] = user["id"]
         doc["approved_at"] = now_iso()
+        doc["approved_by_name"] = user["name"]
     if data.kasa == "cek" and data.check_due_date:
         from routers.checks import create_reminders
         chk = {"id": new_id(), "direction": "alinan" if data.type == "gelir" else "verilen", "account_id": data.account_id,
@@ -116,6 +117,14 @@ async def approve(tx_id: str, user=Depends(require_role("yonetici"))):
                                                      "approved_by_name": user["name"], "approved_at": now_iso()}})
     if not res.matched_count:
         raise HTTPException(status_code=404, detail="Onay bekleyen işlem bulunamadı")
+    t = await db.transactions.find_one({"id": tx_id}, {"_id": 0, "progress_payment_id": 1})
+    if t and t.get("progress_payment_id"):
+        pid = t["progress_payment_id"]
+        h = await db.progress_payments.find_one({"id": pid}, {"_id": 0, "net_amount": 1, "status": 1})
+        agg = await db.transactions.aggregate([{"$match": {"progress_payment_id": pid, "status": "onaylandi"}},
+                                               {"$group": {"_id": None, "t": {"$sum": "$amount"}}}]).to_list(1)
+        if h and agg and agg[0]["t"] >= h["net_amount"] - 0.01 and h["status"] == "onaylandi":
+            await db.progress_payments.update_one({"id": pid}, {"$set": {"status": "odendi", "status_changed_at": now_iso()}})
     return {"ok": True}
 
 

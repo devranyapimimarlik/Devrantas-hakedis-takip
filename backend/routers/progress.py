@@ -114,6 +114,57 @@ async def delete_progress(pid: str, user=Depends(require_role("yonetici"))):
     return {"ok": True}
 
 
+class PayIn(BaseModel):
+    date: str
+    nakit_amount: float = 0
+    cek_amount: float = 0
+    check_due_date: Optional[str] = None
+    check_bank: Optional[str] = ""
+    check_no: Optional[str] = ""
+    description: Optional[str] = ""
+    attachment_file_id: Optional[str] = None
+
+
+@router.get("/{pid}/payments")
+async def progress_payments_list(pid: str, user=Depends(get_current_user)):
+    h = await db.progress_payments.find_one({"id": pid}, {"_id": 0, "net_amount": 1})
+    if not h:
+        raise HTTPException(status_code=404, detail="Hakediş bulunamadı")
+    rows = await db.transactions.find({"progress_payment_id": pid}, {"_id": 0}).sort("date", 1).to_list(200)
+    paid = sum(t["amount"] for t in rows if t["status"] == "onaylandi")
+    pending = sum(t["amount"] for t in rows if t["status"] == "onay_bekliyor")
+    return {"rows": rows, "paid": r2(paid), "pending": r2(pending), "remaining": r2(h["net_amount"] - paid)}
+
+
+@router.post("/{pid}/pay", status_code=201)
+async def pay_progress(pid: str, data: PayIn, user=Depends(get_current_user)):
+    from routers.transactions import TransactionIn, create_transaction
+    h = await db.progress_payments.find_one({"id": pid}, {"_id": 0})
+    if not h:
+        raise HTTPException(status_code=404, detail="Hakediş bulunamadı")
+    if h["status"] == "taslak":
+        raise HTTPException(status_code=400, detail="Önce hakedişi onaylayın")
+    if data.nakit_amount <= 0 and data.cek_amount <= 0:
+        raise HTTPException(status_code=400, detail="Nakit veya çek tutarı girin")
+    if data.cek_amount > 0 and not data.check_due_date:
+        raise HTTPException(status_code=400, detail="Çek için vade tarihi girin")
+    cat = "Taşeron Hakediş Ödemesi" if h["type"] == "taseron" else "Hakediş Tahsilatı"
+    ttype = "gider" if h["type"] == "taseron" else "gelir"
+    desc = data.description or f"Hakediş No {h['number']} {'ödemesi' if ttype == 'gider' else 'tahsilatı'}"
+    created = []
+    for kasa, amount in (("nakit", data.nakit_amount), ("cek", data.cek_amount)):
+        if amount <= 0:
+            continue
+        tx = TransactionIn(site_id=h["site_id"], account_id=h["account_id"], type=ttype, category=cat, amount=amount, date=data.date,
+                           description=desc, kasa=kasa, attachment_file_id=data.attachment_file_id,
+                           check_due_date=data.check_due_date if kasa == "cek" else None, check_bank=data.check_bank, check_no=data.check_no)
+        doc = await create_transaction(tx, user)
+        await db.transactions.update_one({"id": doc["id"]}, {"$set": {"progress_payment_id": pid}})
+        doc["progress_payment_id"] = pid
+        created.append(doc)
+    return {"created": created, **(await progress_payments_list(pid, user))}
+
+
 @router.get("/{pid}/excel")
 async def progress_excel(pid: str, user=Depends(get_current_user)):
     from fastapi.responses import Response
