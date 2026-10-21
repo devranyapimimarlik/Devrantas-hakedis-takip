@@ -3,7 +3,11 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 from typing import Optional, List
 from core import db, get_current_user, require_role, new_id, now_iso, r2
-from excel import build_document
+from excel import build_document, COMPANY
+
+
+def COMPANY_UPPER():
+    return COMPANY.get('upper', '')
 
 router = APIRouter(prefix="/contracts", tags=["contracts"])
 
@@ -119,6 +123,8 @@ async def delete_contract(cid: str, user=Depends(require_role("yonetici"))):
 
 @router.get("/{cid}/excel")
 async def contract_excel(cid: str, user=Depends(get_current_user)):
+    from excel import refresh_company
+    await refresh_company()
     c = await get_contract(cid, user)
     meta = [("Sözleşme No", c["number"]), ("Tarih", c["date"]), ("Taraf", c.get("party_name") or ""),
             ("Taraf Tipi", "Müşteri (İşveren)" if c["party_type"] == "musteri" else "Taşeron (Yüklenici)"),
@@ -128,7 +134,7 @@ async def contract_excel(cid: str, user=Depends(get_current_user)):
     if c.get("advance_amount"): totals.insert(0, ("Avans", c["advance_amount"], False))
     sections = [("ÖDEME ŞARTLARI", c.get("payment_terms")), ("SÖZLEŞME ŞARTLARI", c.get("terms")),
                 ("TEKNİK ŞARTNAME", c.get("technical_spec")), ("NOTLAR", c.get("notes"))]
-    sig = ("İŞVEREN\nKaşe / İmza", "YÜKLENİCİ\nDEVRANTAŞ YAPI MİMARLIK\nKaşe / İmza") if c["party_type"] == "musteri" else ("YÜKLENİCİ (TAŞERON)\nKaşe / İmza", "İŞVEREN\nDEVRANTAŞ YAPI MİMARLIK\nKaşe / İmza")
+    sig = ("İŞVEREN\nKaşe / İmza", f"YÜKLENİCİ\n{COMPANY_UPPER()}\nKaşe / İmza") if c["party_type"] == "musteri" else ("YÜKLENİCİ (TAŞERON)\nKaşe / İmza", f"İŞVEREN\n{COMPANY_UPPER()}\nKaşe / İmza")
     data = build_document("SÖZLEŞME", meta, c["items"], totals, sections, sig)
     return Response(content=data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     headers={"Content-Disposition": f"attachment; filename=\"sozlesme-{c['number']}.xlsx\""})

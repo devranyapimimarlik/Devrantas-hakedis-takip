@@ -27,15 +27,21 @@ def _w(ws, row, col, val, bold=False, size=10, color="1C1917", fill=None, align=
     return c
 
 
+async def refresh_company():
+    from routers.settings import company_info, logo_path
+    COMPANY.update(await company_info())
+    COMPANY["logo"] = await logo_path()
+
+
 def build_table(title: str, subtitle: str, columns: list, rows: list, summary: list = None) -> bytes:
     wb = Workbook(); ws = wb.active; ws.title = safe_title(title)
     widths = [max(14, min(50, len(str(c)) + 6)) for c in columns]
     for i, w in enumerate(widths, 1):
         ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w if i > 1 else max(w, 30)
-    img = XLImage(str(LOGO)); img.width = img.height = 70
+    img = XLImage(COMPANY.get("logo") or str(LOGO)); img.width = img.height = 70
     ws.add_image(img, "A1")
     for rr in (1, 2, 3, 4): ws.row_dimensions[rr].height = 16 if rr > 1 else 28
-    _w(ws, 1, 2, COMPANY["name"], bold=True, size=14, color=GOLD)
+    _w(ws, 1, 2, COMPANY.get("upper") or COMPANY["name"], bold=True, size=14, color=GOLD)
     _w(ws, 2, 2, COMPANY["address"], size=9, color="57534E"); _w(ws, 3, 2, COMPANY["phone"], size=9, color="57534E"); _w(ws, 4, 2, COMPANY["email"], size=9, color="57534E")
     _w(ws, 6, 1, title, bold=True, size=16, color=GOLD); _w(ws, 7, 1, subtitle, size=9, color="57534E")
     r = 9
@@ -55,14 +61,15 @@ def build_table(title: str, subtitle: str, columns: list, rows: list, summary: l
     return buf.getvalue()
 
 
-def build_document(title: str, meta: list, items: list, totals: list, sections: list, signatures=("Müşteri Onayı", "DEVRANTAŞ YAPI MİMARLIK\nKaşe / İmza")) -> bytes:
+def build_document(title: str, meta: list, items: list, totals: list, sections: list, signatures=None) -> bytes:
+    signatures = signatures or ("Müşteri Onayı", f"{COMPANY.get('upper', '')}\nKaşe / İmza")
     wb = Workbook(); ws = wb.active; ws.title = safe_title(title)
     for col, w in zip("ABCDEF", [6, 48, 12, 14, 18, 20]):
         ws.column_dimensions[col].width = w
-    img = XLImage(str(LOGO)); img.width = img.height = 70
+    img = XLImage(COMPANY.get("logo") or str(LOGO)); img.width = img.height = 70
     ws.add_image(img, "A1")
     ws.row_dimensions[1].height = 28; ws.row_dimensions[2].height = 16; ws.row_dimensions[3].height = 16; ws.row_dimensions[4].height = 16
-    _w(ws, 1, 2, COMPANY["name"], bold=True, size=14, color=GOLD)
+    _w(ws, 1, 2, COMPANY.get("upper") or COMPANY["name"], bold=True, size=14, color=GOLD)
     _w(ws, 2, 2, COMPANY["address"], size=9, color="57534E")
     _w(ws, 3, 2, COMPANY["phone"], size=9, color="57534E")
     _w(ws, 4, 2, COMPANY["email"], size=9, color="57534E")

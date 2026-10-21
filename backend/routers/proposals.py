@@ -111,6 +111,8 @@ async def proposal_excel(pid: str, user=Depends(get_current_user)):
     if not p:
         raise HTTPException(status_code=404, detail="Teklif bulunamadı")
     p = await _enrich(p)
+    from excel import refresh_company
+    await refresh_company()
     data = build_document("FİYAT TEKLİFİ", [("Teklif No", p["number"]), ("Tarih", p["date"]), ("Sayın", p.get("customer_name") or ""), ("Proje / İş", p["title"]),
                                              ("Proje Türü", p.get("project_type") or ""), ("Konum", p.get("location") or ""), ("Geçerlilik", f"{p.get('validity_days', 15)} gün")],
                           p["items"], [("Ara Toplam", p["subtotal"], False)] + ([("İskonto", -p["discount"], False)] if p.get("discount") else []) +

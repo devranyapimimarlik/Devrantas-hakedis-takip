@@ -42,8 +42,9 @@ export default function Checks() {
   const [sp] = useSearchParams();
   const [dir, setDir] = useState(sp.get("direction") || "tumu");
   const [open, setOpen] = useState(false);
+  const [endorse, setEndorse] = useState(null);
   const { data = [], isLoading } = useQuery({ queryKey: ["checks"], queryFn: () => api.get("/checks").then((r) => r.data) });
-  const inv = () => ["checks", "reminders", "dashboard", "accounts", "reports"].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+  const inv = () => ["checks", "reminders", "dashboard", "accounts", "reports", "transactions", "pending-count", "progress"].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
   const st = useMutation({ mutationFn: ({ id, status }) => api.patch(`/checks/${id}/status`, { status }), onSuccess: () => { inv(); toast.success("Durum güncellendi"); }, onError: (e) => toast.error(errMsg(e)) });
   const del = useMutation({ mutationFn: (id) => api.delete(`/checks/${id}`), onSuccess: () => { inv(); toast.success("Silindi"); } });
   const rows = data.filter((c) => dir === "tumu" || c.direction === dir);
@@ -68,8 +69,9 @@ export default function Checks() {
                 {c.status === "portfoyde" && <>
                   <GoldButton size="sm" onClick={() => st.mutate({ id: c.id, status: c.direction === "alinan" ? "tahsil_edildi" : "odendi" })} data-testid={`check-settle-${c.id}`}>{c.direction === "alinan" ? "Tahsil Edildi" : "Ödendi"}</GoldButton>
                   <GoldButton size="sm" variant="outline" onClick={() => st.mutate({ id: c.id, status: "karsiliksiz" })} data-testid={`check-bounce-${c.id}`}>Karşılıksız</GoldButton>
-                  {c.direction === "alinan" && <GoldButton size="sm" variant="outline" onClick={() => st.mutate({ id: c.id, status: "ciro_edildi" })} data-testid={`check-endorse-${c.id}`}>Ciro</GoldButton>}
+                  {c.direction === "alinan" && <GoldButton size="sm" variant="outline" onClick={() => setEndorse(c)} data-testid={`check-endorse-${c.id}`}>Ciro Et</GoldButton>}
                 </>}
+                {c.status === "ciro_edildi" && c.endorsed_to_name && <span className="text-xs text-charcoal-light">Ciro: {c.endorsed_to_name}</span>}
                 <button onClick={() => window.confirm("Silinsin mi?") && del.mutate(c.id)} className="p-2 rounded-full hover:bg-red-50 text-charcoal-muted hover:text-red-700" data-testid={`check-delete-${c.id}`}><Trash2 className="w-4 h-4" /></button>
               </div>
             </div>
@@ -77,6 +79,31 @@ export default function Checks() {
         </div>
       )}
       <Dialog open={open} onOpenChange={setOpen}><DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle className="font-serif text-2xl">Çek Kaydı</DialogTitle></DialogHeader><CheckForm onDone={() => setOpen(false)} /></DialogContent></Dialog>
+      {endorse && <EndorseDialog check={endorse} onClose={() => { setEndorse(null); inv(); }} />}
     </div>
+  );
+}
+
+function EndorseDialog({ check, onClose }) {
+  const [f, setF] = useState({ account_id: "", progress_payment_id: "", date: today(), description: "" });
+  const { data: subs = [] } = useQuery({ queryKey: ["accounts", "taseron"], queryFn: () => api.get("/accounts", { params: { type: "taseron" } }).then((r) => r.data) });
+  const { data: haks = [] } = useQuery({ queryKey: ["progress", "acc", f.account_id], queryFn: () => api.get("/progress-payments", { params: { account_id: f.account_id } }).then((r) => r.data.filter((h) => h.status === "onaylandi")), enabled: !!f.account_id });
+  const m = useMutation({
+    mutationFn: () => api.post(`/checks/${check.id}/endorse`, { ...f, progress_payment_id: f.progress_payment_id || null }),
+    onSuccess: () => { toast.success("Çek ciro edildi — ödeme kaydı yönetici onayına düştü"); onClose(); }, onError: (e) => toast.error(errMsg(e)),
+  });
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-lg"><DialogHeader><DialogTitle className="font-serif text-2xl">Çeki Taşerona Ciro Et</DialogTitle></DialogHeader>
+        <p className="text-sm text-charcoal-light -mt-2">{check.bank} {check.check_no} · <Money value={check.amount} className="font-semibold text-gold" /> · Vade {fmtDate(check.due_date)}</p>
+        <form onSubmit={(e) => { e.preventDefault(); if (!f.account_id) return toast.error("Taşeron seçin"); m.mutate(); }} className="space-y-4" data-testid="endorse-form">
+          <Field label="Taşeron"><NSelect value={f.account_id} onChange={(e) => setF({ ...f, account_id: e.target.value, progress_payment_id: "" })} required data-testid="endorse-account-select"><option value="">Seçin</option>{subs.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</NSelect></Field>
+          <Field label="Bağlanacak Hakediş (isteğe bağlı)" hint="Seçilmezse taşeron avansı olarak işlenir"><NSelect value={f.progress_payment_id} onChange={(e) => setF({ ...f, progress_payment_id: e.target.value })} data-testid="endorse-progress-select"><option value="">Avans olarak kaydet</option>{haks.map((h) => <option key={h.id} value={h.id}>No {h.number} · {h.site_name} · {fmtTL(h.net_amount)}</option>)}</NSelect></Field>
+          <Field label="Tarih"><NInput type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} data-testid="endorse-date-input" /></Field>
+          <Field label="Açıklama"><NInput value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></Field>
+          <GoldButton type="submit" disabled={m.isPending} className="w-full" data-testid="endorse-submit-button">Ciro Et ve Ödeme Oluştur</GoldButton>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

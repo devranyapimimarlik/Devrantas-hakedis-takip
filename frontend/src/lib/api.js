@@ -2,6 +2,7 @@ import axios from "axios";
 
 export const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const TOKEN_KEY = "dvt_token";
+export const LOGO_URL = `${API}/settings/logo`;
 
 export const getToken = () => localStorage.getItem(TOKEN_KEY);
 export const setToken = (t) => (t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY));

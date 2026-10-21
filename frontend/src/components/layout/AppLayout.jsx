@@ -2,13 +2,14 @@ import { useState } from "react";
 import { NavLink, Outlet, useNavigate, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
+import { useSettings } from "@/context/SettingsContext";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { STATUS_LABELS } from "@/lib/format";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
   LayoutGrid, Building2, Users, HardHat, ReceiptText, FileText, BarChart3, Menu, LogOut, Bell,
-  FileSignature, Banknote, CalendarClock, Sparkles, ShieldCheck, Wallet, Activity, UserCog, KeyRound,
+  FileSignature, Banknote, CalendarClock, Sparkles, ShieldCheck, Wallet, Activity, UserCog, KeyRound, Palette,
 } from "lucide-react";
 
 const TABS = [
@@ -32,6 +33,7 @@ const MORE = [
   { to: "/raporlar?tab=para_akisi", label: "Para Akışı", icon: Activity, id: "cashflow" },
   { to: "/asistan", label: "Yapay Zeka Asistan", icon: Sparkles, id: "ai" },
   { to: "/yonetim/kullanicilar", label: "Yönetim (alt kullanıcılar ve yetkiler)", icon: UserCog, id: "users", admin: true },
+  { to: "/ayarlar/gorunum", label: "Görünüm (logo ve renk)", icon: Palette, id: "appearance", admin: true },
   { to: "/sifre", label: "Şifremi değiştir", icon: KeyRound, id: "password" },
 ];
 
@@ -61,20 +63,22 @@ function MoreMenu({ open, onOpenChange }) {
 
 export default function AppLayout() {
   const { user, isManager } = useAuth();
+  const { settings, logoUrl } = useSettings();
+  const brand = settings?.short_name || "Devrantaş";
   const nav = useNavigate();
   const [more, setMore] = useState(false);
   const { data: rem } = useQuery({ queryKey: ["reminders"], queryFn: () => api.get("/reminders").then((r) => r.data), refetchInterval: 60000 });
   const { data: pend } = useQuery({ queryKey: ["pending-count"], queryFn: () => api.get("/transactions", { params: { status: "onay_bekliyor" } }).then((r) => r.data.length), refetchInterval: 60000 });
 
   const linkCls = ({ isActive }) => cn("flex items-center gap-3 px-4 py-2.5 rounded-full text-sm font-medium transition-colors",
-    isActive ? "bg-gradient-to-r from-[#B8860B] to-[#A67C0A] text-white shadow-sm" : "text-charcoal-light hover:bg-gold-bg hover:text-charcoal");
+    isActive ? "bg-gradient-to-r from-gold to-gold-dark text-white shadow-sm" : "text-charcoal-light hover:bg-gold-bg hover:text-charcoal");
 
   return (
     <div className="min-h-screen flex overflow-x-hidden">
       <aside className="hidden lg:flex w-72 shrink-0 fixed inset-y-0 left-0 z-30 flex-col border-r border-gold-border/70 bg-[#F5F0E6]/70 backdrop-blur">
         <Link to="/" className="flex items-center gap-3 px-6 pt-6 pb-5">
-          <img src="/logo.png" alt="Devrantaş" className="w-12 h-12 rounded-full shadow-sm" />
-          <div><p className="font-serif text-2xl font-bold text-charcoal leading-none">Devrantaş</p><p className="text-xs text-charcoal-light mt-0.5">Yönetici paneli</p></div>
+          <img src={logoUrl} alt={brand} className="w-12 h-12 rounded-full shadow-sm object-contain" />
+          <div><p className="font-serif text-2xl font-bold text-charcoal leading-none">{brand}</p><p className="text-xs text-charcoal-light mt-0.5">Yönetici paneli</p></div>
         </Link>
         <nav className="flex-1 overflow-y-auto px-4 pb-4 space-y-1" data-testid="sidebar-nav">
           {TABS.map((t) => (
@@ -96,8 +100,8 @@ export default function AppLayout() {
       <div className="flex-1 lg:pl-72 min-w-0 flex flex-col">
         <header className="sticky top-0 z-20 backdrop-blur-md bg-[#FDFBF7]/85 border-b border-gold-border/70">
           <div className="flex items-center gap-3 px-4 md:px-8 h-[72px]">
-            <img src="/logo.png" alt="" className="w-10 h-10 rounded-full lg:hidden" />
-            <div className="lg:hidden"><p className="font-serif text-xl font-bold text-charcoal leading-none">Devrantaş</p><p className="text-[11px] text-charcoal-light">{isManager ? "Yönetici paneli" : STATUS_LABELS[user?.role]}</p></div>
+            <img src={logoUrl} alt="" className="w-10 h-10 rounded-full lg:hidden object-contain" />
+            <div className="lg:hidden"><p className="font-serif text-xl font-bold text-charcoal leading-none">{brand}</p><p className="text-[11px] text-charcoal-light">{isManager ? "Yönetici paneli" : STATUS_LABELS[user?.role]}</p></div>
             <div className="flex-1" />
             <button onClick={() => nav("/odeme-takvimi")} className="relative p-2 rounded-full hover:bg-gold-bg" data-testid="reminder-bell">
               <Bell className="w-5 h-5 text-charcoal-light" />

@@ -39,8 +39,9 @@ COMPANY = {"name": "Devrantaş Yapı Mimarlık İnşaat Ltd. Şti.", "address": 
            "phone": "Tel: 0533 482 57 02", "email": "E-posta: Devrantasyapimimarlik@gmail.com"}
 
 
-def header(story, doc_type: str, number: str, date: str, company: str = "DEVRANTAŞ YAPI MİMARLIK"):
-    logo = Image(str(FONT_DIR / "logo.png"), width=18 * mm, height=18 * mm)
+def header(story, doc_type: str, number: str, date: str, company: str = None):
+    company = company or COMPANY["upper"]
+    logo = Image(COMPANY.get("logo") or str(FONT_DIR / "logo.png"), width=18 * mm, height=18 * mm)
     t = Table([[logo, Paragraph(company, S_TITLE), Paragraph(f"<b>{doc_type}</b><br/>No: {number}<br/>Tarih: {date}", S_SUB)]],
               colWidths=[22 * mm, 88 * mm, 60 * mm])
     t.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("ALIGN", (2, 0), (2, 0), "RIGHT"),
@@ -91,6 +92,12 @@ def footer(canvas, doc):
     canvas.restoreState()
 
 
+async def refresh_company():
+    from routers.settings import company_info, logo_path
+    COMPANY.update(await company_info())
+    COMPANY["logo"] = await logo_path()
+
+
 def build(story) -> bytes:
     buf = BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=20 * mm, rightMargin=20 * mm, topMargin=18 * mm, bottomMargin=26 * mm)
@@ -98,10 +105,11 @@ def build(story) -> bytes:
     return buf.getvalue()
 
 
-def report_pdf(title: str, subtitle: str, cols: list, rows: list, summary=None):
+async def report_pdf(title: str, subtitle: str, cols: list, rows: list, summary=None):
     from reportlab.lib.pagesizes import landscape
+    await refresh_company()
     story = []
-    header(story, title, "-", __import__("datetime").date.today().isoformat(), company="DEVRANTAŞ YAPI MİMARLIK İNŞAAT LTD. ŞTİ.")
+    header(story, title, "-", __import__("datetime").date.today().isoformat(), company=COMPANY["upper"])
     story += [Paragraph(subtitle, S_SUB), Spacer(1, 4 * mm)]
     if summary:
         info_table(story, [(k, tl(v) if isinstance(v, (int, float)) else v) for k, v in summary])
@@ -145,6 +153,7 @@ async def progress_pdf(pid: str, user=Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Hakediş bulunamadı")
     site = await db.sites.find_one({"id": h["site_id"]}, {"_id": 0}) or {}
     acc = await db.accounts.find_one({"id": h["account_id"]}, {"_id": 0}) or {}
+    await refresh_company()
     story = []
     kind = "MÜŞTERİ HAKEDİŞİ" if h["type"] == "musteri" else "TAŞERON HAKEDİŞİ"
     header(story, kind, str(h["number"]), h["date"])
@@ -224,8 +233,9 @@ async def proposal_pdf(pid: str, user=Depends(get_current_user)):
     if not p:
         raise HTTPException(status_code=404, detail="Teklif bulunamadı")
     acc = await db.accounts.find_one({"id": p.get("account_id")}, {"_id": 0}) if p.get("account_id") else None
+    await refresh_company()
     story = []
-    header(story, "FİYAT TEKLİFİ", p["number"], p["date"], company="DEVRANTAŞ YAPI MİMARLIK İNŞAAT LTD. ŞTİ.")
+    header(story, "FİYAT TEKLİFİ", p["number"], p["date"], company=COMPANY["upper"])
     rows = [("Sayın", (acc or {}).get("name") or p.get("customer_name")), ("Proje / İş", p["title"])]
     if p.get("project_type"): rows.append(("Proje Türü", p["project_type"]))
     if p.get("location"): rows.append(("Konum", p["location"]))
@@ -250,7 +260,7 @@ async def proposal_pdf(pid: str, user=Depends(get_current_user)):
     if p.get("notes"):
         story += [Paragraph("Şartlar ve Notlar", S_H), Paragraph(p["notes"].replace("\n", "<br/>"), S_BODY), Spacer(1, 3 * mm)]
     story += [Paragraph(f"Teklif geçerlilik süresi: {p.get('validity_days', 15)} gündür.", S_BODY), Spacer(1, 16 * mm)]
-    sig = Table([[Paragraph("Müşteri Onayı", S_LABEL), Paragraph("DEVRANTAŞ YAPI MİMARLIK<br/>Kaşe / İmza", S_LABEL)]], colWidths=[85 * mm, 85 * mm])
+    sig = Table([[Paragraph("Müşteri Onayı", S_LABEL), Paragraph(f"{COMPANY['upper']}<br/>Kaşe / İmza", S_LABEL)]], colWidths=[85 * mm, 85 * mm])
     sig.setStyle(TableStyle([("LINEABOVE", (0, 0), (-1, 0), 0.5, MUTED), ("TOPPADDING", (0, 0), (-1, -1), 4), ("ALIGN", (1, 0), (1, 0), "RIGHT")]))
     story.append(sig)
     return pdf_response(build(story), f"teklif-{p['number']}.pdf")
@@ -261,6 +271,7 @@ async def statement_pdf(account_id: str, detailed: bool = False, user=Depends(ge
     from routers.accounts import statement
     data = await statement(account_id, user)
     acc, rows = data["account"], data["rows"]
+    await refresh_company()
     story = []
     header(story, "DETAYLI CARİ EKSTRE" if detailed else "CARİ EKSTRE", acc["name"], __import__("datetime").date.today().isoformat())
     info_table(story, [("Cari Tipi", "Müşteri" if acc["type"] == "musteri" else "Taşeron"), ("Telefon", acc.get("phone")), ("Vergi No", acc.get("tax_no")),
@@ -283,8 +294,9 @@ async def statement_pdf(account_id: str, detailed: bool = False, user=Depends(ge
 async def contract_pdf(cid: str, user=Depends(get_current_user)):
     from routers.contracts import get_contract
     c = await get_contract(cid, user)
+    await refresh_company()
     story = []
-    header(story, "SÖZLEŞME", c["number"], c["date"], company="DEVRANTAŞ YAPI MİMARLIK İNŞAAT LTD. ŞTİ.")
+    header(story, "SÖZLEŞME", c["number"], c["date"], company=COMPANY["upper"])
     info_table(story, [("Taraf", c.get("party_name")), ("Taraf Tipi", "Müşteri (İşveren)" if c["party_type"] == "musteri" else "Taşeron (Yüklenici)"),
                        ("Şantiye", c.get("site_name")), ("İşin Adı", c["title"]), ("Başlangıç", c.get("start_date")), ("Bitiş", c.get("end_date")),
                        ("Süre", f"{c['duration_days']} gün" if c.get("duration_days") else None)])
@@ -297,7 +309,7 @@ async def contract_pdf(cid: str, user=Depends(get_current_user)):
         if c.get(key):
             story += [Paragraph(head, S_H), Paragraph(c[key].replace("\n", "<br/>"), S_BODY), Spacer(1, 4 * mm)]
     story.append(Spacer(1, 14 * mm))
-    left, right = ("İŞVEREN<br/>Kaşe / İmza", "YÜKLENİCİ<br/>DEVRANTAŞ YAPI MİMARLIK<br/>Kaşe / İmza") if c["party_type"] == "musteri" else ("YÜKLENİCİ (TAŞERON)<br/>Kaşe / İmza", "İŞVEREN<br/>DEVRANTAŞ YAPI MİMARLIK<br/>Kaşe / İmza")
+    left, right = ("İŞVEREN<br/>Kaşe / İmza", f"YÜKLENİCİ<br/>{COMPANY['upper']}<br/>Kaşe / İmza") if c["party_type"] == "musteri" else ("YÜKLENİCİ (TAŞERON)<br/>Kaşe / İmza", f"İŞVEREN<br/>{COMPANY['upper']}<br/>Kaşe / İmza")
     sig = Table([[Paragraph(left, S_LABEL), Paragraph(right, S_LABEL)]], colWidths=[85 * mm, 85 * mm])
     sig.setStyle(TableStyle([("LINEABOVE", (0, 0), (-1, 0), 0.5, MUTED), ("TOPPADDING", (0, 0), (-1, -1), 4), ("ALIGN", (1, 0), (1, 0), "RIGHT")]))
     story.append(sig)

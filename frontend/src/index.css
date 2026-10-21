@@ -5,6 +5,7 @@
 
 @layer base {
     :root {
+        --gold: 184 134 11; --gold-light: 212 175 55; --gold-dark: 139 101 8; --gold-bg: 250 245 232; --gold-border: 226 211 180;
         --background: 40 43% 98%;
         --foreground: 20 14% 10%;
         --card: 0 0% 100%;
@@ -36,21 +37,21 @@
     body {
         @apply bg-background text-foreground font-sans antialiased;
         background-color: #FDFBF7;
-        background-image: radial-gradient(circle at 1px 1px, rgba(184, 134, 11, 0.07) 1px, transparent 0);
+        background-image: radial-gradient(circle at 1px 1px, rgb(var(--gold) / 0.07) 1px, transparent 0);
         background-size: 26px 26px;
     }
     h1, h2, h3 { @apply font-serif tracking-tight; }
-    ::selection { background: #D4AF37; color: #1C1917; }
+    ::selection { background: rgb(var(--gold-light)); color: #1C1917; }
     input, select, textarea { font-size: 16px; }
     @media (min-width: 768px) { input, select, textarea { font-size: 14px; } }
 }
 
 @layer components {
-    .gold-card { @apply bg-white/90 border border-[#E2D3B4]/70 shadow-sm hover:shadow-md transition-shadow rounded-2xl; }
-    .soft-card { @apply bg-white/80 border border-[#E2D3B4]/60 rounded-2xl; }
+    .gold-card { @apply bg-white/90 border border-[rgb(var(--gold-border)/0.7)] shadow-sm hover:shadow-md transition-shadow rounded-2xl; }
+    .soft-card { @apply bg-white/80 border border-[rgb(var(--gold-border)/0.6)] rounded-2xl; }
     .row-line { @apply flex items-center justify-between gap-3 py-3 border-b border-stone-100 last:border-0 text-sm; }
-    .label-gold { @apply text-[11px] font-mono uppercase tracking-[0.18em] text-[#B8860B] font-semibold; }
-    .gold-badge { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-[#FAF5E8] text-[#B8860B] border border-[#E2D3B4]; }
+    .label-gold { @apply text-[11px] font-mono uppercase tracking-[0.18em] text-gold font-semibold; }
+    .gold-badge { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-[#FAF5E8] text-gold border border-[#E2D3B4]; }
     .money { @apply font-mono tabular-nums; }
     .fade-up { animation: fadeUp .45s ease both; }
 }
@@ -58,7 +59,7 @@
 @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-thumb { background: #E2D3B4; border-radius: 8px; }
+::-webkit-scrollbar-thumb { background: rgb(var(--gold-border)); border-radius: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
 
 @layer base {

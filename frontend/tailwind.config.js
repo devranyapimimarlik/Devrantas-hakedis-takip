@@ -14,17 +14,15 @@ module.exports = {
         sans: ['Manrope', 'system-ui', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'monospace'],
       },
-      colors: {
-        gold: { DEFAULT: '#B8860B', light: '#D4AF37', bg: '#FAF5E8', border: '#E2D3B4', dark: '#8B6508' },
-        cream: { DEFAULT: '#FDFBF7', dark: '#F5F0E6' },
-        charcoal: { DEFAULT: '#1C1917', light: '#57534E', muted: '#78716C' },
-      },
       borderRadius: {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)'
       },
       colors: {
+        gold: { DEFAULT: 'rgb(var(--gold) / <alpha-value>)', light: 'rgb(var(--gold-light) / <alpha-value>)', bg: 'rgb(var(--gold-bg) / <alpha-value>)', border: 'rgb(var(--gold-border) / <alpha-value>)', dark: 'rgb(var(--gold-dark) / <alpha-value>)' },
+        cream: { DEFAULT: '#FDFBF7', dark: '#F5F0E6' },
+        charcoal: { DEFAULT: '#1C1917', light: '#57534E', muted: '#78716C' },
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {

@@ -9,6 +9,7 @@ import { GoldButton, Chip, NInput } from "@/components/shared/Inputs";
 import { FileUpload } from "@/components/shared/FileUpload";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { DocHeader } from "@/context/SettingsContext";
 import { ArrowLeft, FileDown, Sparkles, Loader2, Trash2, Wallet } from "lucide-react";
 
 export default function ProgressDetail() {
@@ -39,11 +40,10 @@ export default function ProgressDetail() {
           {isManager && <button onClick={() => window.confirm("Hakediş silinsin mi?") && del.mutate()} className="p-2 rounded-full hover:bg-red-50 text-red-700" data-testid="progress-delete-button"><Trash2 className="w-5 h-5" /></button>}
         </>} />
       <div className="gold-card p-5 md:p-8">
-        <div className="flex items-center justify-between mb-5"><div className="flex items-center gap-3"><img src="/logo.png" alt="" className="w-12 h-12 rounded-full" /><div><p className="font-serif text-xl font-bold">DEVRANTAŞ</p><p className="text-[11px] text-charcoal-light tracking-wider">YAPI MİMARLIK İNŞAAT LTD. ŞTİ.</p></div></div><div className="text-right"><p className="font-serif text-2xl text-gold font-bold">HAKEDİŞ</p><StatusBadge status={h.status} testId="progress-status" /></div></div>
-        <div className="border-t-2 border-gold mb-5" />
+        <DocHeader title="HAKEDİŞ" /><div className="flex justify-end -mt-3 mb-3"><StatusBadge status={h.status} testId="progress-status" /></div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[560px]" data-testid="progress-items-table">
-            <thead><tr className="bg-[#F1E8D6] text-left"><th className="p-2 rounded-l-lg">#</th><th className="p-2">İşin cinsi</th><th className="p-2">Birim</th><th className="p-2 text-right">Miktar</th><th className="p-2 text-right">Birim fiyat</th><th className="p-2 text-right rounded-r-lg">Toplam</th></tr></thead>
+            <thead><tr className="bg-gold-bg text-left"><th className="p-2 rounded-l-lg">#</th><th className="p-2">İşin cinsi</th><th className="p-2">Birim</th><th className="p-2 text-right">Miktar</th><th className="p-2 text-right">Birim fiyat</th><th className="p-2 text-right rounded-r-lg">Toplam</th></tr></thead>
             <tbody>{h.items.map((it, i) => <tr key={i} className="border-b border-gold-border/40"><td className="p-2 text-charcoal-muted">{i + 1}</td><td className="p-2">{it.description}</td><td className="p-2">{it.unit}</td><td className="p-2 text-right money">{it.quantity}</td><td className="p-2 text-right money">{fmtTL(it.unit_price)}</td><td className="p-2 text-right money font-medium">{fmtTL(it.total)}</td></tr>)}</tbody>
           </table>
         </div>

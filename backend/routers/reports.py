@@ -174,7 +174,7 @@ async def export_report(tab: str, format: str = "xlsx", start: Optional[str] = N
     subtitle = " · ".join(parts) or f"Tüm kayıtlar · {date.today().isoformat()}"
     title = TAB_TITLES[tab]
     if format == "pdf":
-        return report_pdf(title, subtitle, cols, rows, summ)
+        return await report_pdf(title, subtitle, cols, rows, summ)
     data = build_table(title, subtitle, cols, rows, summ)
     return Response(content=data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     headers={"Content-Disposition": f"attachment; filename=\"rapor-{tab}.xlsx\""})

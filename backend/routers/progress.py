@@ -179,7 +179,10 @@ async def close_if_paid(pid: str):
 @router.get("/{pid}/excel")
 async def progress_excel(pid: str, user=Depends(get_current_user)):
     from fastapi.responses import Response
-    from excel import build_document
+    from excel import build_document, COMPANY
+
+    def COMPANY_UPPER():
+        return COMPANY.get('upper', '')
     h = await get_progress(pid, user)
     meta = [("Hakediş No", h["number"]), ("Tarih", h["date"]), ("Dönem", h.get("period") or ""),
             ("Hakediş Tipi", "Müşteri Hakedişi" if h["type"] == "musteri" else "Taşeron Hakedişi"),
@@ -191,6 +194,8 @@ async def progress_excel(pid: str, user=Depends(get_current_user)):
     if h.get("previous_deduction"): totals.append(("Önceki Kesinti / Avans", -h["previous_deduction"], False))
     totals += [("KDV Matrahı", h["base_amount"], False), (f"KDV %{h['vat_rate']:g}", h["vat_amount"], False), ("NET ÖDENECEK", h["net_amount"], True)]
     sections = [("ŞARTLAR", h.get("terms")), ("TEKNİK ŞARTNAME", h.get("technical_spec")), ("NOTLAR", h.get("notes")), ("YAPAY ZEKA ÖZETİ", h.get("ai_summary"))]
-    data = build_document("HAKEDİŞ", meta, h["items"], totals, sections, ("Hazırlayan / Kontrol Eden", "ONAYLAYAN\nDEVRANTAŞ YAPI MİMARLIK\nKaşe / İmza"))
+    from excel import refresh_company
+    await refresh_company()
+    data = build_document("HAKEDİŞ", meta, h["items"], totals, sections, ("Hazırlayan / Kontrol Eden", f"ONAYLAYAN\n{COMPANY_UPPER()}\nKaşe / İmza"))
     return Response(content=data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     headers={"Content-Disposition": f"attachment; filename=\"hakedis-{h['number']}.xlsx\""})

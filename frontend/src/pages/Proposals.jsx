@@ -6,6 +6,7 @@ import { PageHeader, StatusBadge, EmptyState, Field, Money } from "@/components/
 import { NInput, NSelect, NTextarea, GoldButton } from "@/components/shared/Inputs";
 import { ItemsEditor } from "@/pages/ProgressPayments";
 import { toast } from "sonner";
+import { DocHeader, DocFooter } from "@/context/SettingsContext";
 import { Sparkles, Loader2, Trash2, Plus } from "lucide-react";
 
 const COMPANY = { name: "Devrantaş Yapı Mimarlık İnşaat Ltd. Şti.", address: "Nurtanesi Sok. No: 3/1, Merkez Mah., Çekmeköy, İstanbul", phone: "0533 482 57 02", email: "Devrantasyapimimarlik@gmail.com" };
@@ -73,11 +74,7 @@ export default function Proposals() {
     <div data-testid="proposals-page">
       <PageHeader title="Teklif Hazırla" subtitle="Belge görünümünde doldurun; PDF, Excel veya WhatsApp ile paylaşın." actions={editId && <GoldButton variant="outline" onClick={reset} data-testid="new-proposal-button"><Plus className="w-4 h-4" /> Yeni teklif</GoldButton>} />
       <div className="gold-card p-5 md:p-8" data-testid="proposal-document">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3"><img src="/logo.png" alt="Devrantaş" className="w-14 h-14 rounded-full" /><div><p className="font-serif text-2xl font-bold tracking-wide">DEVRANTAŞ</p><p className="text-[11px] text-charcoal-light tracking-wider">YAPI MİMARLIK İNŞAAT LTD. ŞTİ.</p></div></div>
-          <p className="font-serif text-2xl md:text-3xl text-gold font-bold">FİYAT TEKLİFİ</p>
-        </div>
-        <div className="border-t-2 border-gold my-5" />
+        <DocHeader title="FİYAT TEKLİFİ" />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Sayın (müşteri)"><NSelect value={f.account_id} onChange={set("account_id")} data-testid="proposal-customer-select"><option value="">Seçin</option>{customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</NSelect></Field>
           <Field label="Proje / iş"><NInput placeholder="ör. Çayırdağı Sok. mantolama" value={f.title} onChange={set("title")} data-testid="proposal-title-input" /></Field>
@@ -106,7 +103,7 @@ export default function Proposals() {
         <NTextarea value={f.notes} onChange={set("notes")} className="!min-h-[110px] rounded-2xl" data-testid="proposal-notes-input" />
         <p className="mt-4 text-sm flex items-center gap-2">Teklif geçerlilik süresi: <NInput type="number" value={f.validity_days} onChange={set("validity_days")} className="!w-20 !h-9" data-testid="proposal-validity-input" /> gündür.</p>
         <div className="grid grid-cols-2 gap-8 mt-10 text-sm text-charcoal-light"><div className="border-t border-charcoal-muted pt-2 text-center">Müşteri onayı</div><div className="border-t border-charcoal-muted pt-2 text-center">DEVRANTAŞ YAPI MİMARLIK<br />Kaşe / İmza</div></div>
-        <div className="border-t border-gold-border mt-8 pt-5 text-center text-xs text-charcoal-light space-y-1"><p className="font-semibold text-charcoal text-sm">{COMPANY.name}</p><p>{COMPANY.address}</p><p>Tel: {COMPANY.phone}</p><p>E-posta: {COMPANY.email}</p></div>
+        <DocFooter />
       </div>
       <div className="grid grid-cols-3 gap-3 mt-5">
         <GoldButton variant="outline" onClick={pdf} data-testid="proposal-pdf-button">Yazdır / PDF</GoldButton>

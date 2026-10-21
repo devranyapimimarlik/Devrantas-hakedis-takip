@@ -101,6 +101,44 @@ async def delete_check(cid: str, user=Depends(get_current_user)):
     return {"ok": True}
 
 
+class EndorseIn(BaseModel):
+    account_id: str
+    progress_payment_id: Optional[str] = None
+    date: Optional[str] = None
+    description: Optional[str] = ""
+
+
+@router.post("/checks/{cid}/endorse", status_code=201)
+async def endorse_check(cid: str, data: EndorseIn, user=Depends(get_current_user)):
+    from routers.transactions import TransactionIn, create_transaction
+    c = await db.checks.find_one({"id": cid}, {"_id": 0})
+    if not c:
+        raise HTTPException(status_code=404, detail="Çek bulunamadı")
+    if c["direction"] != "alinan" or c["status"] != "portfoyde":
+        raise HTTPException(status_code=400, detail="Sadece portföydeki alınan çekler ciro edilebilir")
+    acc = await db.accounts.find_one({"id": data.account_id, "type": "taseron"}, {"_id": 0})
+    if not acc:
+        raise HTTPException(status_code=404, detail="Taşeron bulunamadı")
+    h = None
+    if data.progress_payment_id:
+        h = await db.progress_payments.find_one({"id": data.progress_payment_id, "account_id": data.account_id}, {"_id": 0})
+        if not h or h["status"] == "taslak":
+            raise HTTPException(status_code=400, detail="Onaylı bir hakediş seçin")
+    desc = data.description or f"Çek cirosu {c.get('bank', '')} {c.get('check_no', '')}" + (f" - Hakediş No {h['number']}" if h else "")
+    tx = TransactionIn(site_id=(h or {}).get("site_id") or c.get("site_id"), account_id=data.account_id, type="gider",
+                       category="Taşeron Hakediş Ödemesi" if h else "Taşeron Avansı", amount=c["amount"], date=data.date or today_str(),
+                       description=desc.strip(), kasa="cek", attachment_file_id=c.get("image_file_id"))
+    doc = await create_transaction(tx, user)
+    upd = {"check_id": cid, "endorsed": True}
+    if h:
+        upd["progress_payment_id"] = h["id"]
+    await db.transactions.update_one({"id": doc["id"]}, {"$set": upd})
+    await db.checks.update_one({"id": cid}, {"$set": {"status": "ciro_edildi", "endorsed_to": data.account_id, "endorsed_to_name": acc["name"],
+                                                     "endorsed_at": now_iso(), "endorse_transaction_id": doc["id"]}})
+    await db.reminders.update_many({"source_id": cid}, {"$set": {"dismissed": True}})
+    return {"ok": True, "transaction": {**doc, **upd}}
+
+
 # ---------- Scheduled payments (Kira / Kart / Kredi) ----------
 class PaymentIn(BaseModel):
     type: str  # kira | kredi_karti | kredi | diger

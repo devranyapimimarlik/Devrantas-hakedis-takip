@@ -17,9 +17,11 @@ export function Users() {
   const role = useMutation({ mutationFn: ({ id, role }) => api.patch(`/auth/users/${id}/role`, { role }), onSuccess: () => { inv(); toast.success("Yetki güncellendi"); }, onError: (e) => toast.error(errMsg(e)) });
   const del = useMutation({ mutationFn: (id) => api.delete(`/auth/users/${id}`), onSuccess: () => { inv(); toast.success("Kullanıcı silindi"); }, onError: (e) => toast.error(errMsg(e)) });
   const add = useMutation({ mutationFn: () => api.post("/auth/register-sub", f), onSuccess: () => { inv(); setF({ name: "", email: "", password: "", role: "muhasebe" }); toast.success("Kullanıcı eklendi"); }, onError: (e) => toast.error(errMsg(e)) });
+  const cleanup = useMutation({ mutationFn: () => api.post("/admin/cleanup-test-data"), onSuccess: (r) => { qc.invalidateQueries(); toast.success(`Test verileri temizlendi: ${r.data.total} kayıt silindi`); }, onError: (e) => toast.error(errMsg(e)) });
   return (
     <div data-testid="users-page">
-      <PageHeader title="Kullanıcılar ve Yetkiler" subtitle="Yönetici: tüm yetkiler + gider onayı · Muhasebe: hakediş durumu · Şantiye Şefi: kayıt girişi" />
+      <PageHeader title="Kullanıcılar ve Yetkiler" subtitle="Yönetici: tüm yetkiler + gider onayı · Muhasebe: hakediş durumu · Şantiye Şefi: kayıt girişi"
+        actions={<GoldButton variant="danger" onClick={() => window.confirm("TEST_ önekli tüm deneme kayıtları (şantiye, cari, işlem, hakediş, çek, teklif, sözleşme, test kullanıcıları) kalıcı olarak silinecek. Devam edilsin mi?") && cleanup.mutate()} disabled={cleanup.isPending} data-testid="cleanup-test-data-button"><Trash2 className="w-4 h-4" /> Test Verilerini Temizle</GoldButton>} />
       <form onSubmit={(e) => { e.preventDefault(); add.mutate(); }} className="gold-card p-5 grid grid-cols-1 sm:grid-cols-5 gap-3 mb-6 items-end" data-testid="add-user-form">
         <Field label="Ad Soyad"><NInput value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required data-testid="user-name-input" /></Field>
         <Field label="E-posta"><NInput type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} required data-testid="user-email-input" /></Field>

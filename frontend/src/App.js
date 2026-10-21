@@ -1,7 +1,11 @@
+import { LOGO_URL } from "@/lib/api";
 import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { SettingsProvider } from "@/context/SettingsContext";
+import Appearance from "@/pages/Appearance";
+import Portal from "@/pages/Portal";
 import AppLayout from "@/components/layout/AppLayout";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
@@ -22,7 +26,7 @@ import { Users, ChangePassword } from "@/pages/Admin";
 
 function Protected({ children, admin }) {
   const { user } = useAuth();
-  if (user === null) return <div className="min-h-screen flex items-center justify-center"><img src="/logo.png" alt="" className="w-20 h-20 rounded-full animate-pulse" /></div>;
+  if (user === null) return <div className="min-h-screen flex items-center justify-center"><img src={`${LOGO_URL}`} alt="" className="w-20 h-20 rounded-full animate-pulse" /></div>;
   if (!user) return <Navigate to="/giris" replace />;
   if (admin && user.role !== "yonetici") return <Navigate to="/" replace />;
   return children;
@@ -36,10 +40,12 @@ function LoginRoute() {
 
 export default function App() {
   return (
+    <SettingsProvider>
     <AuthProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/giris" element={<LoginRoute />} />
+          <Route path="/portal/:token" element={<Portal />} />
           <Route element={<Protected><AppLayout /></Protected>}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/santiyeler" element={<Sites />} />
@@ -58,11 +64,13 @@ export default function App() {
             <Route path="/asistan" element={<AiAssistant />} />
             <Route path="/yonetim/kullanicilar" element={<Protected admin><Users /></Protected>} />
             <Route path="/sifre" element={<ChangePassword />} />
+            <Route path="/ayarlar/gorunum" element={<Protected admin><Appearance /></Protected>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
       </BrowserRouter>
       <Toaster position="top-right" richColors />
     </AuthProvider>
+    </SettingsProvider>
   );
 }

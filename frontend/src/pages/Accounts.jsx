@@ -7,7 +7,7 @@ import { PageHeader, EmptyState, Field, Money } from "@/components/shared/Bits";
 import { NInput, NSelect, NTextarea, GoldButton } from "@/components/shared/Inputs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, ChevronRight } from "lucide-react";
+import { Plus, Pencil, Trash2, ChevronRight, Link2 } from "lucide-react";
 
 const EMPTY = { name: "", phone: "", email: "", tax_no: "", address: "", specialty: "", notes: "" };
 
@@ -64,6 +64,11 @@ export default function Accounts({ type }) {
   const [dlg, setDlg] = useState(null); // {mode:'new'|'edit'|'assign', account}
   const { data = [], isLoading } = useQuery({ queryKey: ["accounts", t], queryFn: () => api.get("/accounts", { params: { type: t } }).then((r) => r.data) });
   const del = useMutation({ mutationFn: (id) => api.delete(`/accounts/${id}`), onSuccess: () => { qc.invalidateQueries({ queryKey: ["accounts"] }); toast.success("Silindi"); } });
+  const portal = useMutation({
+    mutationFn: (id) => api.post(`/accounts/${id}/portal-token`),
+    onSuccess: async (r) => { const url = `${window.location.origin}/portal/${r.data.token}`; try { await navigator.clipboard.writeText(url); toast.success("Müşteri portal linki kopyalandı"); } catch { window.prompt("Portal linki:", url); } },
+    onError: (e) => toast.error(errMsg(e)),
+  });
   const total = data.reduce((s, a) => s + a.balance, 0);
 
   return (
@@ -88,6 +93,7 @@ export default function Accounts({ type }) {
               </div>
               <div className="flex items-center gap-2 mt-4 flex-wrap">
                 <Link to={`/cari/${t}/${a.id}`} className="text-gold font-medium text-sm inline-flex items-center gap-1 mr-auto" data-testid={`statement-link-${a.id}`}>Cari ekstre <ChevronRight className="w-4 h-4" /></Link>
+                {isCust && <GoldButton variant="outline" size="sm" onClick={() => portal.mutate(a.id)} data-testid={`portal-link-${a.id}`}><Link2 className="w-3.5 h-3.5" /> Portal linki</GoldButton>}
                 <GoldButton variant="outline" size="sm" onClick={() => setDlg({ mode: "assign", account: a })} data-testid={`assign-site-${a.id}`}>+ Şantiye ata</GoldButton>
                 <GoldButton size="sm" onClick={() => nav(`/hakedis/yeni?account_id=${a.id}&type=${t}`)} data-testid={`new-progress-${a.id}`}>+ Hakediş</GoldButton>
               </div>

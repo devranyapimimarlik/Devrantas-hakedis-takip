@@ -6,6 +6,7 @@ import { PageHeader, EmptyState, Field, Money } from "@/components/shared/Bits";
 import { NInput, NSelect, NTextarea, GoldButton, Chip } from "@/components/shared/Inputs";
 import { ItemsEditor } from "@/pages/ProgressPayments";
 import { toast } from "sonner";
+import { DocHeader, DocFooter } from "@/context/SettingsContext";
 import { Loader2, Trash2, Plus, FileDown } from "lucide-react";
 
 const COMPANY = { name: "Devrantaş Yapı Mimarlık İnşaat Ltd. Şti.", address: "Nurtanesi Sok. No: 3/1, Merkez Mah., Çekmeköy, İstanbul", phone: "0533 482 57 02", email: "Devrantasyapimimarlik@gmail.com" };
@@ -39,11 +40,7 @@ export default function Contracts() {
     <div data-testid="contracts-page">
       <PageHeader title="Sözleşme" subtitle="Birim fiyat cetveli, ödeme şartları ve teknik şartname ile Excel/PDF sözleşme hazırlayın." actions={editId && <GoldButton variant="outline" onClick={reset} data-testid="new-contract-button"><Plus className="w-4 h-4" /> Yeni sözleşme</GoldButton>} />
       <div className="gold-card p-5 md:p-8" data-testid="contract-document">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3"><img src="/logo.png" alt="Devrantaş" className="w-14 h-14 rounded-full" /><div><p className="font-serif text-2xl font-bold tracking-wide">DEVRANTAŞ</p><p className="text-[11px] text-charcoal-light tracking-wider">YAPI MİMARLIK İNŞAAT LTD. ŞTİ.</p></div></div>
-          <p className="font-serif text-2xl md:text-3xl text-gold font-bold">SÖZLEŞME</p>
-        </div>
-        <div className="border-t-2 border-gold my-5" />
+        <DocHeader title="SÖZLEŞME" />
         <div className="flex gap-2 mb-4">{["musteri", "taseron"].map((t) => <Chip key={t} active={f.party_type === t} onClick={() => setF({ ...f, party_type: t, account_id: "" })} data-testid={`contract-party-${t}`}>{t === "musteri" ? "Müşteri Sözleşmesi" : "Taşeron Sözleşmesi"}</Chip>)}</div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label={f.party_type === "musteri" ? "İşveren (Müşteri)" : "Yüklenici (Taşeron)"}><NSelect value={f.account_id} onChange={set("account_id")} data-testid="contract-account-select"><option value="">Seçin</option>{accounts.filter((a) => a.type === f.party_type).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</NSelect></Field>
@@ -68,7 +65,7 @@ export default function Contracts() {
         <p className="font-semibold tracking-wide mt-6 mb-2">TEKNİK ŞARTNAME</p><NTextarea value={f.technical_spec} onChange={set("technical_spec")} placeholder="Malzeme standartları (C30 beton, S420 demir...), uygulama detayları, kabul kriterleri..." className="!min-h-[140px]" data-testid="contract-spec-input" />
         <p className="font-semibold tracking-wide mt-6 mb-2">NOTLAR</p><NTextarea value={f.notes} onChange={set("notes")} className="!min-h-[60px]" data-testid="contract-notes-input" />
         <div className="grid grid-cols-2 gap-8 mt-10 text-sm text-charcoal-light"><div className="border-t border-charcoal-muted pt-2 text-center">{f.party_type === "musteri" ? "İŞVEREN" : "YÜKLENİCİ (TAŞERON)"}<br />Kaşe / İmza</div><div className="border-t border-charcoal-muted pt-2 text-center">{f.party_type === "musteri" ? "YÜKLENİCİ" : "İŞVEREN"}<br />DEVRANTAŞ YAPI MİMARLIK<br />Kaşe / İmza</div></div>
-        <div className="border-t border-gold-border mt-8 pt-5 text-center text-xs text-charcoal-light space-y-1"><p className="font-semibold text-charcoal text-sm">{COMPANY.name}</p><p>{COMPANY.address}</p><p>Tel: {COMPANY.phone} · E-posta: {COMPANY.email}</p></div>
+        <DocFooter />
       </div>
       <div className="grid grid-cols-3 gap-3 mt-5">
         <GoldButton variant="outline" onClick={pdf} data-testid="contract-pdf-button"><FileDown className="w-4 h-4" /> PDF</GoldButton>
