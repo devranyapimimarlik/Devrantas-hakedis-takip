@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, errMsg } from "@/lib/api";
+import { enqueue, isOffline, isNetworkError } from "@/lib/offline";
 import { fmtDate, today } from "@/lib/format";
 import { Field, SectionTitle } from "@/components/shared/Bits";
 import { NInput, GoldButton } from "@/components/shared/Inputs";
@@ -14,11 +15,19 @@ export function SitePhotos({ siteId }) {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState(null);
   const [f, setF] = useState({ file_id: null, date: today(), note: "", progress_percent: "" });
+  const [localFile, setLocalFile] = useState(null);
   const { data = [] } = useQuery({ queryKey: ["site-photos", siteId], queryFn: () => api.get(`/sites/${siteId}/photos`).then((r) => r.data) });
   const inv = () => { qc.invalidateQueries({ queryKey: ["site-photos", siteId] }); qc.invalidateQueries({ queryKey: ["site", siteId] }); };
+  const reset = () => { setOpen(false); setLocalFile(null); setF({ file_id: null, date: today(), note: "", progress_percent: "" }); };
   const add = useMutation({
-    mutationFn: () => api.post(`/sites/${siteId}/photos`, { ...f, progress_percent: f.progress_percent === "" ? null : Number(f.progress_percent) }),
-    onSuccess: () => { inv(); setOpen(false); setF({ file_id: null, date: today(), note: "", progress_percent: "" }); toast.success("Fotoğraf günlüğe eklendi"); },
+    mutationFn: async () => {
+      const payload = { ...f, progress_percent: f.progress_percent === "" ? null : Number(f.progress_percent) };
+      const offlineSave = async () => { await enqueue({ kind: "photo", siteId, payload, file: localFile || null, fileName: localFile?.name }); return null; };
+      if (isOffline() || localFile) return offlineSave();
+      try { return await api.post(`/sites/${siteId}/photos`, payload); }
+      catch (e) { if (isNetworkError(e)) return offlineSave(); throw e; }
+    },
+    onSuccess: (res) => { reset(); if (res) { inv(); toast.success("Fotoğraf günlüğe eklendi"); } else toast.info("Çevrimdışı kaydedildi — bağlantı gelince günlüğe eklenecek"); },
     onError: (e) => toast.error(errMsg(e)),
   });
   const del = useMutation({ mutationFn: (id) => api.delete(`/sites/${siteId}/photos/${id}`), onSuccess: () => { inv(); toast.success("Silindi"); } });
@@ -38,8 +47,8 @@ export function SitePhotos({ siteId }) {
       )}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-md"><DialogHeader><DialogTitle className="font-serif text-2xl">İlerleme Fotoğrafı</DialogTitle></DialogHeader>
-          <form onSubmit={(e) => { e.preventDefault(); if (!f.file_id) return toast.error("Fotoğraf seçin"); add.mutate(); }} className="space-y-4" data-testid="photo-form">
-            <FileUpload value={f.file_id} onChange={(id) => setF({ ...f, file_id: id })} label="Fotoğraf" testId="photo-upload" />
+          <form onSubmit={(e) => { e.preventDefault(); if (!f.file_id && !localFile) return toast.error("Fotoğraf seçin"); add.mutate(); }} className="space-y-4" data-testid="photo-form">
+            <FileUpload value={f.file_id} onChange={(id) => setF({ ...f, file_id: id })} localFile={localFile} onLocalFile={setLocalFile} label="Fotoğraf" testId="photo-upload" />
             <div className="grid grid-cols-2 gap-3">
               <Field label="Tarih"><NInput type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} required data-testid="photo-date-input" /></Field>
               <Field label="İlerleme % (isteğe bağlı)" hint="Girilirse şantiye ilerlemesi güncellenir"><NInput type="number" min="0" max="100" value={f.progress_percent} onChange={(e) => setF({ ...f, progress_percent: e.target.value })} data-testid="photo-progress-input" /></Field>

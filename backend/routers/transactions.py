@@ -1,7 +1,12 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional
 from core import db, get_current_user, require_role, new_id, now_iso
+from routers.push import send_push
+
+
+def tl(v) -> str:
+    return f"{float(v or 0):,.0f} ₺".replace(",", ".")
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
@@ -77,7 +82,7 @@ async def list_transactions(site_id: Optional[str] = None, type: Optional[str] =
 
 
 @router.post("", status_code=201)
-async def create_transaction(data: TransactionIn, user=Depends(get_current_user)):
+async def create_transaction(data: TransactionIn, background: BackgroundTasks, user=Depends(get_current_user)):
     if data.type not in ("gelir", "gider"):
         raise HTTPException(status_code=400, detail="Tip gelir veya gider olmalı")
     if data.amount <= 0:
@@ -107,31 +112,40 @@ async def create_transaction(data: TransactionIn, user=Depends(get_current_user)
     await db.transactions.insert_one(doc)
     doc.pop("_id", None)
     sites, accounts = await _lookups()
-    return await _enrich(doc, sites, accounts)
+    enriched = await _enrich(doc, sites, accounts)
+    if status == "onay_bekliyor":
+        site_name = enriched.get("site_name") or "Genel"
+        background.add_task(send_push, None, "Onay bekleyen gider", f"{tl(data.amount)} · {data.category} · {site_name} — {user['name']}", "/islemler?tab=onay", f"tx-{doc['id']}", ["yonetici"])
+    return enriched
 
 
 @router.post("/{tx_id}/approve")
-async def approve(tx_id: str, user=Depends(require_role("yonetici"))):
+async def approve(tx_id: str, background: BackgroundTasks, user=Depends(require_role("yonetici"))):
     res = await db.transactions.update_one({"id": tx_id, "status": "onay_bekliyor"},
                                            {"$set": {"status": "onaylandi", "approved_by": user["id"],
                                                      "approved_by_name": user["name"], "approved_at": now_iso()}})
     if not res.matched_count:
         raise HTTPException(status_code=404, detail="Onay bekleyen işlem bulunamadı")
-    t = await db.transactions.find_one({"id": tx_id}, {"_id": 0, "progress_payment_id": 1})
+    t = await db.transactions.find_one({"id": tx_id}, {"_id": 0, "progress_payment_id": 1, "created_by": 1, "amount": 1, "category": 1})
     if t and t.get("progress_payment_id"):
         from routers.progress import close_if_paid
         await close_if_paid(t["progress_payment_id"])
+    if t and t.get("created_by") != user["id"]:
+        background.add_task(send_push, [t["created_by"]], "Gider onaylandı", f"{tl(t['amount'])} · {t['category']} — {user['name']} onayladı", "/islemler", f"tx-{tx_id}")
     return {"ok": True}
 
 
 @router.post("/{tx_id}/reject")
-async def reject(tx_id: str, data: RejectIn, user=Depends(require_role("yonetici"))):
+async def reject(tx_id: str, data: RejectIn, background: BackgroundTasks, user=Depends(require_role("yonetici"))):
     res = await db.transactions.update_one({"id": tx_id, "status": "onay_bekliyor"},
                                            {"$set": {"status": "reddedildi", "approved_by": user["id"],
                                                      "approved_by_name": user["name"], "approved_at": now_iso(),
                                                      "reject_reason": data.reason}})
     if not res.matched_count:
         raise HTTPException(status_code=404, detail="Onay bekleyen işlem bulunamadı")
+    t = await db.transactions.find_one({"id": tx_id}, {"_id": 0, "created_by": 1, "amount": 1, "category": 1})
+    if t and t.get("created_by") != user["id"]:
+        background.add_task(send_push, [t["created_by"]], "Gider reddedildi", f"{tl(t['amount'])} · {t['category']} — {data.reason or 'gerekçe yok'}", "/islemler", f"tx-{tx_id}")
     return {"ok": True}
 
 

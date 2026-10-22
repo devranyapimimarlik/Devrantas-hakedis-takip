@@ -12,6 +12,7 @@ import {
   FileSignature, Banknote, CalendarClock, Sparkles, ShieldCheck, Wallet, Activity, UserCog, KeyRound, Palette, Smartphone,
 } from "lucide-react";
 import { InstallBanner } from "@/components/shared/PwaInstall";
+import { OfflineBar } from "@/components/shared/OfflineQueue";
 
 const TABS = [
   { to: "/", label: "Özet", icon: LayoutGrid, id: "dashboard" },
@@ -113,7 +114,7 @@ export default function AppLayout() {
             <button onClick={() => setMore(true)} className="hidden lg:inline-flex p-2 rounded-full hover:bg-gold-bg" data-testid="desktop-more-button"><Menu className="w-5 h-5" /></button>
           </div>
         </header>
-        <main className="flex-1 px-4 md:px-8 py-6 md:py-8 pb-28 lg:pb-10 max-w-[1500px] w-full"><InstallBanner /><Outlet /></main>
+        <main className="flex-1 px-4 md:px-8 py-6 md:py-8 pb-28 lg:pb-10 max-w-[1500px] w-full"><OfflineBar /><InstallBanner /><Outlet /></main>
       </div>
 
       <nav className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-[#FDFBF7]/95 backdrop-blur border-t border-gold-border/70 px-1 pb-[env(safe-area-inset-bottom)]" data-testid="bottom-nav">

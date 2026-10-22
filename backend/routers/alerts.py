@@ -145,8 +145,22 @@ async def run_daily_job(run_id: str):
             status, detail = "hata", str(e)
     else:
         status = "twilio_yok"
+    push = None
+    try:
+        from routers.push import send_push
+        due = summary["due_items"]
+        if due:
+            first = due[0]
+            body = f"{len(due)} çek/ödeme 3 gün içinde vadeli — ilk: {first['title']} {tl(first['amount'])} ({first['due_date']})"
+        else:
+            body = "3 gün içinde vadesi dolan çek/ödeme yok."
+        extra = [f"{len(summary['loss_risks'])} zarar riski" if summary["loss_risks"] else "", f"{len(summary['customer_risks'])} riskli müşteri" if summary["customer_risks"] else "", f"{len(summary['anomalies'])} şüpheli kayıt" if summary["anomalies"] else ""]
+        extra = ", ".join([e for e in extra if e])
+        push = await send_push(None, "Günlük özet", body + (f" · {extra}" if extra else ""), "/", f"daily-{summary['date']}", ["yonetici"])
+    except Exception as e:
+        logger.error(f"Daily push failed: {e}")
     await db.alert_logs.update_one({"run_id": run_id}, {"$set": {"date": summary["date"], "message": summary["message"],
-                                   "alert_count": summary["alert_count"], "status": status, "detail": detail, "to": to, "finished_at": now_iso()}})
+                                   "alert_count": summary["alert_count"], "status": status, "detail": detail, "to": to, "push": push, "finished_at": now_iso()}})
 
 
 @router.get("/alerts/daily-summary")
@@ -164,7 +178,7 @@ class SendIn(BaseModel):
 @router.post("/alerts/send")
 async def send_now(data: SendIn, user=Depends(require_role("yonetici"))):
     if not twilio_configured():
-        raise HTTPException(status_code=400, detail="Twilio yapılandırılmadı. backend/.env içine TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN ve TWILIO_WHATSAPP_FROM / TWILIO_SMS_FROM ekleyin.")
+        raise HTTPException(status_code=400, detail="Twilio henüz etkin değil. Twilio hesap bilgileri (SID, Auth Token, WhatsApp/SMS numarası) güvenli anahtar kartından eklenmeli.")
     to = data.to or os.environ.get("MANAGER_PHONE")
     summary = await build_daily_summary()
     try:

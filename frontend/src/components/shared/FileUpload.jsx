@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { api, errMsg } from "@/lib/api";
-import { Upload, X, Image as ImageIcon, Loader2, FileText } from "lucide-react";
+import { isOffline, isNetworkError } from "@/lib/offline";
+import { Upload, X, Image as ImageIcon, Loader2, FileText, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-export function FileUpload({ value, onChange, label = "Dekont / Fiş Fotoğrafı", testId = "file-upload" }) {
+export function FileUpload({ value, onChange, label = "Dekont / Fiş Fotoğrafı", testId = "file-upload", localFile = null, onLocalFile }) {
   const ref = useRef();
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState("");
@@ -12,6 +13,7 @@ export function FileUpload({ value, onChange, label = "Dekont / Fiş Fotoğrafı
   const pick = async (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
+    if (onLocalFile && isOffline()) { onLocalFile(f); setName(f.name); toast.info("Çevrimdışı: fotoğraf cihazda tutuldu, bağlantı gelince yüklenecek"); e.target.value = ""; return; }
     setBusy(true);
     try {
       const fd = new FormData();
@@ -21,22 +23,24 @@ export function FileUpload({ value, onChange, label = "Dekont / Fiş Fotoğrafı
       setName(f.name);
       toast.success("Dosya yüklendi");
     } catch (err) {
-      toast.error(errMsg(err));
+      if (onLocalFile && isNetworkError(err)) { onLocalFile(f); setName(f.name); toast.info("Bağlantı yok: fotoğraf cihazda tutuldu, bağlantı gelince yüklenecek"); }
+      else toast.error(errMsg(err));
     } finally {
       setBusy(false);
       e.target.value = "";
     }
   };
 
+  const has = value || localFile;
   return (
     <div className="space-y-1.5">
       <span className="text-xs font-semibold text-charcoal-light">{label}</span>
       <input ref={ref} type="file" accept="image/*,application/pdf" className="hidden" onChange={pick} data-testid={`${testId}-input`} />
-      {value ? (
+      {has ? (
         <div className="flex items-center gap-2 border border-gold-border bg-gold-bg rounded-lg px-3 py-2 text-sm">
-          <ImageIcon className="w-4 h-4 text-gold" />
-          <span className="truncate flex-1 text-charcoal">{name || "Dosya eklendi"}</span>
-          <button type="button" onClick={() => { onChange(null); setName(""); }} className="text-charcoal-muted hover:text-red-700" data-testid={`${testId}-remove`}>
+          {localFile ? <WifiOff className="w-4 h-4 text-amber-700" /> : <ImageIcon className="w-4 h-4 text-gold" />}
+          <span className="truncate flex-1 text-charcoal">{name || localFile?.name || "Dosya eklendi"}{localFile ? " (çevrimdışı)" : ""}</span>
+          <button type="button" onClick={() => { onChange(null); onLocalFile?.(null); setName(""); }} className="text-charcoal-muted hover:text-red-700" data-testid={`${testId}-remove`}>
             <X className="w-4 h-4" />
           </button>
         </div>

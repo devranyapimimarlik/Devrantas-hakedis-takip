@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { api, errMsg } from "@/lib/api";
+import { enqueue, isOffline, isNetworkError } from "@/lib/offline";
 import { fmtTL, fmtDate, today, STATUS_LABELS } from "@/lib/format";
 import { PageHeader, StatusBadge, EmptyState, Field, Money } from "@/components/shared/Bits";
 import { NInput, NSelect, NTextarea, GoldButton, Chip } from "@/components/shared/Inputs";
@@ -15,6 +16,7 @@ export function TransactionForm({ defaults = {}, onDone }) {
   const qc = useQueryClient();
   const [f, setF] = useState({ type: "gider", category: "Malzeme", amount: "", date: today(), description: "", kasa: "", site_id: "", account_id: "", attachment_file_id: null, check_due_date: "", check_bank: "", check_no: "", ...defaults });
   const [split, setSplit] = useState({ nakit: "", cek: "" });
+  const [localFile, setLocalFile] = useState(null);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const { data: cats } = useQuery({ queryKey: ["categories"], queryFn: () => api.get("/transactions/categories").then((r) => r.data) });
   const { data: sites = [] } = useQuery({ queryKey: ["sites"], queryFn: () => api.get("/sites").then((r) => r.data) });
@@ -22,9 +24,18 @@ export function TransactionForm({ defaults = {}, onDone }) {
   const isSub = f.category.startsWith("Taşeron");
   const isIncome = f.type === "gelir";
   const accType = isIncome ? "musteri" : isSub ? "taseron" : null;
+  const saveOffline = async (list) => {
+    for (const b of list) await enqueue({ kind: "transaction", payload: b, file: localFile || null, fileName: localFile?.name });
+    toast.info(`Çevrimdışı kaydedildi (${list.length}) — bağlantı gelince otomatik gönderilecek`);
+    onDone?.();
+  };
   const m = useMutation({
-    mutationFn: async (list) => { for (const b of list) await api.post("/transactions", b); return list; },
-    onSuccess: (list) => { ["transactions", "dashboard", "sites", "pending-count", "accounts", "site", "kasa", "reports", "reminders"].forEach((k) => qc.invalidateQueries({ queryKey: [k] })); toast.success(list[0].type === "gider" ? "Ödeme kaydedildi — yönetici onayı bekliyor" : "Tahsilat kaydedildi"); onDone?.(); },
+    mutationFn: async (list) => {
+      if (isOffline() || localFile) { await saveOffline(list); return null; }
+      try { for (const b of list) await api.post("/transactions", b); return list; }
+      catch (e) { if (isNetworkError(e)) { await saveOffline(list); return null; } throw e; }
+    },
+    onSuccess: (list) => { if (!list) return; ["transactions", "dashboard", "sites", "pending-count", "accounts", "site", "kasa", "reports", "reminders"].forEach((k) => qc.invalidateQueries({ queryKey: [k] })); toast.success(list[0].type === "gider" ? "Ödeme kaydedildi — yönetici onayı bekliyor" : "Tahsilat kaydedildi"); onDone?.(); },
     onError: (e) => toast.error(errMsg(e)),
   });
   const submit = (e) => {
@@ -73,7 +84,7 @@ export function TransactionForm({ defaults = {}, onDone }) {
         </div>
       )}
       <Field label="Açıklama"><NTextarea value={f.description} onChange={set("description")} placeholder={isSub ? "ör. Hakediş No 2 ödemesi" : "Açıklama"} data-testid="tx-desc-input" /></Field>
-      <FileUpload value={f.attachment_file_id} onChange={(id) => setF({ ...f, attachment_file_id: id })} label={isIncome ? "Tahsilat Dekontu / Çek Fotoğrafı" : "Dekont / Fiş Fotoğrafı"} testId="tx-attachment" />
+      <FileUpload value={f.attachment_file_id} onChange={(id) => setF({ ...f, attachment_file_id: id })} localFile={localFile} onLocalFile={setLocalFile} label={isIncome ? "Tahsilat Dekontu / Çek Fotoğrafı" : "Dekont / Fiş Fotoğrafı"} testId="tx-attachment" />
       <GoldButton type="submit" disabled={m.isPending} className="w-full" data-testid="tx-submit-button">{isIncome ? "Tahsilatı Kaydet" : "Ödemeyi Kaydet"}</GoldButton>
     </form>
   );

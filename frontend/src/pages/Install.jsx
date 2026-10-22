@@ -1,5 +1,6 @@
 import { PageHeader } from "@/components/shared/Bits";
 import { InstallGuide } from "@/components/shared/PwaInstall";
+import { PushToggle } from "@/components/shared/PushToggle";
 import { useSettings } from "@/context/SettingsContext";
 import { ShieldCheck, WifiOff, Bell, Palette } from "lucide-react";
 
@@ -20,6 +21,7 @@ export default function Install() {
         <div><p className="font-serif text-2xl font-bold">{settings?.short_name || "Devrantaş"}</p><p className="text-sm text-charcoal-light">Ana ekranda bu simge ve bu isimle görünür. Görünüm sayfasından logo/renk değiştirince simge de güncellenir.</p></div>
       </div>
       <InstallGuide />
+      <div className="mt-6"><PushToggle /></div>
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
         {PERKS.map((p) => (
           <div key={p.t} className="soft-card p-4 flex gap-3"><p.icon className="w-5 h-5 text-gold shrink-0 mt-0.5" /><div><p className="text-sm font-semibold">{p.t}</p><p className="text-xs text-charcoal-light">{p.d}</p></div></div>
