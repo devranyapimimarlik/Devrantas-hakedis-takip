@@ -1,0 +1,30 @@
+{
+  "summary": "Iteration-3 testing: 18/18 new backend tests PASSED (1 skipped — no existing proposal to re-render after settings PUT, non-blocking). Covered: (1) Settings — GET public returns defaults; PUT non-admin -> 403; PUT invalid color 'red' -> 400; PUT admin with short_name 'QA Firma' + primary_color '#1D4ED8' -> 200 and reflected on subsequent GET; GET /settings/logo -> 200 image/png; GET /settings/manifest.json -> 200 with theme_color '#1D4ED8' and 2 png icons; defaults RESTORED at end (short_name 'Devrantaş', primary_color '#B8860B', address/phone/email/tagline/company_name). (2) Check endorse — endorse portföydeki alınan çek with progress_payment_id -> 201, tx kasa=cek, category 'Taşeron Hakediş Ödemesi', status onay_bekliyor, check_id + progress_payment_id attached; check.status='ciro_edildi', endorsed_to set; progress-payments pending reflects 5000; re-endorse same check -> 400; endorse 'verilen' check -> 400; endorse without progress_payment_id -> category 'Taşeron Avansı'. (3) Portal — POST /accounts/{id}/portal-token (admin) returns token; GET /portal/{token} public returns customer, sites[].photos (len>=1), progress_payments (len>=1), balance; GET /portal/{token}/photo/{file_id} returns image; invalid token -> 404; DELETE portal-token -> subsequent GET /portal/{token} -> 404. (4) Cleanup — non-admin (muhasebe) POST /admin/cleanup-test-data -> 403; admin -> 200 with counts (total>=10), no accounts starting with TEST_/Test_/QA_ remain, admin can still login. Frontend verified end-to-end: /ayarlar/gorunum color-preset-1D4ED8 updates CSS var --gold to '29 78 216', save shows success toast, restore to B8860B works; /cekler shows check-endorse-{id} button that opens endorse-form with endorse-account-select + endorse-submit-button; /cari/musteri shows portal-link-{id} button; /yonetim/kullanicilar shows cleanup-test-data-button; public /portal/invalid_xyz_token (new context, no auth) renders 'Bağlantı geçersiz veya kapatılmış' error page as expected.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iteration3.py",
+    "/app/test_reports/pytest/iter3.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "settings.py get_settings uses an in-process dict _cache invalidated on PUT only. With multiple backend workers this cache would drift across workers after PUT (stale reads from workers that did not handle the PUT). Single-worker preview is fine; flag for production scale-out.",
+    "settings.py update_settings validates primary_color regex (#RRGGBB) — good; but does NOT validate email format, phone, or iban (acceptable since UI is admin-only). Length limits also absent — admin could stuff arbitrarily long strings; low priority.",
+    "portal.py _acc_by_token leaks nothing beyond customer scope; portal_photo correctly double-checks (file must belong to a site owned by the customer). Good tenant isolation.",
+    "portal.py revoke_portal_token uses $unset on 'portal_token' so re-issuing generates a NEW token (secrets.token_urlsafe(24)) — good, old links cannot be revived.",
+    "checks.endorse_check correctly rejects non-alinan or non-portfoyde (400). Edge: `h['status'] == 'taslak'` check only rejects taslak but not 'reddedildi' if such status exists; verify progress_payments status enum. Not blocking.",
+    "portal.cleanup_test_data uses regex ^(TEST_|Test_|test_|TEST |QA_) across many collections and cascades to progress_payments/transactions/checks/payments/reminders/proposals/contracts/site_photos. Deletes test users by email containing 'test' (case-insensitive) excluding self and all yonetici. Reasonable guard. It does NOT delete files/objects in object storage — orphaned storage objects possible after cleanup; minor.",
+    "portal.cleanup_test_data: `report['total']` sums all deleted_count values AFTER the users key was added; verified total=sum(report.values()) returns a plain int ok.",
+    "Non-admin cleanup test only passes because require_role returns 403 — expected. Verified."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration3.py (new, 19 pytest tests covering Settings/Endorse/Portal/Cleanup/Restore)"
+  ],
+  "success_rate": {"backend": "100% (18/18, 1 skipped — no proposals exist to test dynamic company name on PDF/Excel)", "frontend": "100% (all iteration-3 selectors + flows reachable)"},
+  "test_credentials": "admin@devrantas.com / Devrantas2026! (seeded).",
+  "seed_data_creation": "test_iteration3.py creates (and self-cleans via cleanup-test-data at end): 2 taseron, 2 musteri, 2 sites, 2 progress_payments, 3 checks (2 alinan + 1 verilen), 1 muhasebe user (email prefix 'test_acc_*@example.com'), 1 uploaded PNG. All TEST_ prefixed. Settings restored to Devrantaş defaults by TestZZZRestore after cleanup.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run with `pytest /app/backend/tests/test_iteration3.py -n 0` because test classes have cross-class ordering dependency (TestZZCleanup must run after TestEndorse/TestPortal to wipe TEST_ data; TestZZZRestore after cleanup). Running with xdist loadscope (default pytest.ini -n 2 --dist loadscope) breaks the ordering because fixtures are per-worker and cleanup from one worker leaves records from another; always pass `-n 0` for this file. Iteration-1 (/app/backend/tests/backend_test.py) and iteration-2 (/app/backend/tests/test_iteration2.py) remain compatible with the default pytest.ini config. Non-admin registration is only via POST /auth/register-sub (admin-only). Public /auth/register is removed. Email domain .local is rejected by pydantic EmailStr — use @example.com for synthetic test emails.",
+  "rca of the issue": "No issues found in iteration-3 scope."
+}

@@ -33,9 +33,10 @@
 - Test: testing_agent iteration_1 → backend 36/36 (PDF filename latin-1 hatası düzeltildi), frontend smoke OK.
 - Tur 2: Hakediş ödeme kısayolu (POST /progress-payments/{id}/pay, nakit/çek bölüşüm, otomatik "odendi"), rapor Excel/PDF export (GET /reports/export?tab&format), günlük özet + WhatsApp (routers/alerts.py; cron `.emergent/crons.yml` 09:00 Europe/Istanbul → POST /api/cron/daily-reminders, Bearer WEBHOOK_CRON_SECRET; Twilio opsiyonel: TWILIO_ACCOUNT_SID/AUTH_TOKEN/WHATSAPP_FROM/SMS_FROM, MANAGER_PHONE=+905334825702; zarar riski, müşteri riski >%33, şüpheli kayıt özeti), şantiye fotoğraf günlüğü (/sites/{id}/photos → hakediş PDF'ine eklenir), AI iş kataloğu (ai.py WORK_CATALOG, GET /ai/work-catalog; teklif/maliyet AI sadece katalogdan seçer). Test iteration_2 → 34/34 backend.
 - Code review düzeltmeleri: public /auth/register kaldırıldı (kullanıcılar sadece yönetici tarafından /auth/register-sub ile eklenir), seed_admin artık mevcut şifreyi ezmiyor, ?auth= query token fallback kaldırıldı, müşteri hakedişi tam tahsilatta otomatik "odendi", cron idempotency unique index + claim kaydı. Backend pytest 70/70.
+- Tur 3 (22 Eki 2026): Firma görünümü (routers/settings.py GET/PUT /settings, /settings/logo, /settings/manifest.json; SettingsContext canlı tema CSS değişkenleri; PDF/Excel firma bilgisi dinamik), çek ciro (POST /checks/{id}/endorse → hakedişe bağlı taşeron ödemesi), müşteri portalı (POST /accounts/{id}/portal-token, GET /portal/{token} salt-okunur), TEST_ veri temizliği endpoint'i. Test iteration_3 → backend 18/18, frontend %100.
+- PWA / iOS+Android kurulum: public/sw.js (network-first, offline fallback), index.js'te SW kaydı, index.html apple/mobile meta + apple-touch-icon 180, /settings/logo?size=180|192|512 kare opak ikon üretimi, manifest id/scope/shortcuts; /telefona-kur sayfası (iOS Safari adımları + Android beforeinstallprompt "Ana Ekrana Kur" butonu), mobilde kapatılabilir kurulum banner'ı (InstallBanner). Ekran görüntüsü ile doğrulandı (SW registered, manifest linked).
 
 ## Backlog
-- P1: Twilio anahtarları gelince gerçek WhatsApp/SMS gönderimi (kod hazır; .env doldurulması yeterli).
-- P1: Test verilerinin temizlenmesi (DB'de TEST_ önekli kayıtlar var) — kullanıcı onayı ile.
-- P2: Görünüm ayarları (logo/renk), çoklu para birimi, çek ciro ile taşeron ödemesi bağlama.
+- P1: Twilio anahtarları (TWILIO_ACCOUNT_SID/AUTH_TOKEN/WHATSAPP_FROM/SMS_FROM) secrets kartı ile alınacak; gerçek WhatsApp/SMS gönderimi henüz doğrulanmadı.
+- P2: Push bildirimleri (Web Push) ile telefona anlık uyarı; çoklu para birimi.
 - P2: Recharts ilk mount boyut uyarısı (kozmetik); dashboard/daily-summary N+1 aggregation performansı (büyük veri).

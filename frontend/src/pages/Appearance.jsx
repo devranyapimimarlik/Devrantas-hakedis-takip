@@ -7,6 +7,7 @@ import { NInput, GoldButton } from "@/components/shared/Inputs";
 import { FileUpload } from "@/components/shared/FileUpload";
 import { toast } from "sonner";
 import { Smartphone } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const PRESETS = ["#B8860B", "#1D4ED8", "#047857", "#B91C1C", "#6D28D9", "#0F766E", "#C2410C", "#1C1917"];
 
@@ -50,7 +51,7 @@ export default function Appearance() {
             <div className="mt-4"><FileUpload value={f.logo_file_id} onChange={(id) => setF({ ...f, logo_file_id: id })} label="Logo (PNG/JPG, kare önerilir)" testId="settings-logo" /></div>
             {f.logo_file_id !== settings.logo_file_id && <p className="text-[11px] text-amber-700 mt-2">Kaydet'e basınca logo uygulanır.</p>}
           </div>
-          <div className="soft-card p-4 text-xs text-charcoal-light flex gap-3"><Smartphone className="w-5 h-5 text-gold shrink-0" /><p><b>Telefon ana ekranına ekleme:</b> Safari/Chrome'da paylaş menüsünden "Ana Ekrana Ekle" deyin; simge olarak bu logo, isim olarak kısa ad kullanılır.</p></div>
+          <div className="soft-card p-4 text-xs text-charcoal-light flex gap-3"><Smartphone className="w-5 h-5 text-gold shrink-0" /><p><b>Telefon ana ekranına ekleme:</b> Simge olarak bu logo, isim olarak kısa ad kullanılır. Adım adım kurulum için <Link to="/telefona-kur" className="text-gold underline" data-testid="appearance-install-link">Telefona Kur</Link> sayfasına bakın.</p></div>
         </div>
       </form>
     </div>

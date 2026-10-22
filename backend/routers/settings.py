@@ -87,15 +87,30 @@ async def update_settings(data: SettingsIn, user=Depends(require_role("yonetici"
 
 
 @router.get("/logo")
-async def logo(v: Optional[str] = None):
+async def logo(v: Optional[str] = None, size: Optional[int] = None):
     path = await logo_path()
-    return FileResponse(path, media_type="image/png", headers={"Cache-Control": "public, max-age=300"})
+    headers = {"Cache-Control": "public, max-age=300"}
+    if not size or size not in (180, 192, 512):
+        return FileResponse(path, media_type="image/png", headers=headers)
+    s = await get_settings()
+    out = FONT_DIR / f"icon_{size}_{s.get('logo_file_id') or 'default'}_{s['primary_color'].lstrip('#')}.png"
+    if not out.exists():
+        from PIL import Image
+        im = Image.open(path).convert("RGBA")
+        pad = int(size * 0.12)
+        im.thumbnail((size - 2 * pad, size - 2 * pad))
+        canvas = Image.new("RGB", (size, size), (253, 251, 247))
+        canvas.paste(im, ((size - im.width) // 2, (size - im.height) // 2), im)
+        canvas.save(out, "PNG")
+    return FileResponse(str(out), media_type="image/png", headers=headers)
 
 
 @router.get("/manifest.json")
 async def manifest():
     s = await get_settings()
-    icons = [{"src": f"/api/settings/logo?v={s.get('logo_file_id') or 'default'}", "sizes": sz, "type": "image/png", "purpose": "any maskable"} for sz in ("192x192", "512x512")]
-    data = {"name": f"{s['short_name']} {s.get('tagline') or ''}".strip(), "short_name": s["short_name"], "start_url": "/", "display": "standalone",
-            "background_color": "#FDFBF7", "theme_color": s["primary_color"], "lang": "tr", "icons": icons}
+    ver = s.get("logo_file_id") or "default"
+    icons = [{"src": f"/api/settings/logo?size={sz}&v={ver}", "sizes": f"{sz}x{sz}", "type": "image/png", "purpose": "any maskable"} for sz in (192, 512)]
+    data = {"id": "/", "name": f"{s['short_name']} {s.get('tagline') or ''}".strip(), "short_name": s["short_name"], "description": f"{s['company_name']} şantiye finans ve hakediş takibi",
+            "start_url": "/", "scope": "/", "display": "standalone", "orientation": "portrait", "background_color": "#FDFBF7", "theme_color": s["primary_color"], "lang": "tr", "icons": icons,
+            "shortcuts": [{"name": "Gelir-Gider", "url": "/islemler", "icons": icons[:1]}, {"name": "Hakedişler", "url": "/hakedis", "icons": icons[:1]}, {"name": "Çekler", "url": "/cekler", "icons": icons[:1]}]}
     return JSONResponse(data, media_type="application/manifest+json")

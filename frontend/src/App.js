@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { SettingsProvider } from "@/context/SettingsContext";
 import Appearance from "@/pages/Appearance";
+import Install from "@/pages/Install";
 import Portal from "@/pages/Portal";
 import AppLayout from "@/components/layout/AppLayout";
 import Login from "@/pages/Login";
@@ -65,6 +66,7 @@ export default function App() {
             <Route path="/yonetim/kullanicilar" element={<Protected admin><Users /></Protected>} />
             <Route path="/sifre" element={<ChangePassword />} />
             <Route path="/ayarlar/gorunum" element={<Protected admin><Appearance /></Protected>} />
+            <Route path="/telefona-kur" element={<Install />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

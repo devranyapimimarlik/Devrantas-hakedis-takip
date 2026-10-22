@@ -9,8 +9,9 @@ import { STATUS_LABELS } from "@/lib/format";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
   LayoutGrid, Building2, Users, HardHat, ReceiptText, FileText, BarChart3, Menu, LogOut, Bell,
-  FileSignature, Banknote, CalendarClock, Sparkles, ShieldCheck, Wallet, Activity, UserCog, KeyRound, Palette,
+  FileSignature, Banknote, CalendarClock, Sparkles, ShieldCheck, Wallet, Activity, UserCog, KeyRound, Palette, Smartphone,
 } from "lucide-react";
+import { InstallBanner } from "@/components/shared/PwaInstall";
 
 const TABS = [
   { to: "/", label: "Özet", icon: LayoutGrid, id: "dashboard" },
@@ -34,6 +35,7 @@ const MORE = [
   { to: "/asistan", label: "Yapay Zeka Asistan", icon: Sparkles, id: "ai" },
   { to: "/yonetim/kullanicilar", label: "Yönetim (alt kullanıcılar ve yetkiler)", icon: UserCog, id: "users", admin: true },
   { to: "/ayarlar/gorunum", label: "Görünüm (logo ve renk)", icon: Palette, id: "appearance", admin: true },
+  { to: "/telefona-kur", label: "Telefona kur (iOS / Android)", icon: Smartphone, id: "install" },
   { to: "/sifre", label: "Şifremi değiştir", icon: KeyRound, id: "password" },
 ];
 
@@ -111,7 +113,7 @@ export default function AppLayout() {
             <button onClick={() => setMore(true)} className="hidden lg:inline-flex p-2 rounded-full hover:bg-gold-bg" data-testid="desktop-more-button"><Menu className="w-5 h-5" /></button>
           </div>
         </header>
-        <main className="flex-1 px-4 md:px-8 py-6 md:py-8 pb-28 lg:pb-10 max-w-[1500px] w-full"><Outlet /></main>
+        <main className="flex-1 px-4 md:px-8 py-6 md:py-8 pb-28 lg:pb-10 max-w-[1500px] w-full"><InstallBanner /><Outlet /></main>
       </div>
 
       <nav className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-[#FDFBF7]/95 backdrop-blur border-t border-gold-border/70 px-1 pb-[env(safe-area-inset-bottom)]" data-testid="bottom-nav">
