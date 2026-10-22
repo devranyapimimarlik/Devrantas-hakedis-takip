@@ -67,7 +67,7 @@ export function EmptyState({ title = "Kayıt bulunamadı", desc, action, testId 
 
 export function Field({ label, children, className, hint }) {
   return (
-    <label className={cn("block space-y-1.5", className)}>
+    <label className={cn("block space-y-1.5 min-w-0", className)}>
       <span className="text-xs font-semibold text-charcoal-light">{label}</span>
       {children}
       {hint && <span className="block text-[11px] text-charcoal-muted">{hint}</span>}

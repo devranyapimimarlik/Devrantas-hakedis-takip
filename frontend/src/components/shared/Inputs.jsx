@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-const base = "w-full h-11 md:h-10 rounded-xl border border-gold-border bg-[#FDFBF7] px-3 text-sm text-charcoal focus:outline-none focus:ring-2 focus:ring-gold/30 focus:border-gold transition-colors disabled:opacity-60";
+const base = "w-full min-w-0 max-w-full h-11 md:h-10 rounded-xl border border-gold-border bg-[#FDFBF7] px-3 text-sm text-charcoal focus:outline-none focus:ring-2 focus:ring-gold/30 focus:border-gold transition-colors disabled:opacity-60";
 
 export function NInput({ className, ...p }) {
   return <input className={cn(base, className)} {...p} />;

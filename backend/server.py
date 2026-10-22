@@ -3,7 +3,7 @@ import os
 import logging
 from fastapi import FastAPI, APIRouter
 from starlette.middleware.cors import CORSMiddleware
-from routers import auth, accounts, sites, transactions, progress, checks, proposals, files, ai, pdf, dashboard, reports, contracts, alerts, settings, portal, push
+from routers import auth, accounts, sites, transactions, progress, checks, proposals, files, ai, pdf, dashboard, reports, contracts, alerts, settings, portal, push, voice
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
@@ -16,7 +16,7 @@ async def root():
     return {"message": "Devrantaş Yapı Mimarlık ERP API"}
 
 
-for r in (auth, accounts, sites, transactions, progress, checks, proposals, files, ai, pdf, dashboard, reports, contracts, alerts, settings, portal, push):
+for r in (auth, accounts, sites, transactions, progress, checks, proposals, files, ai, pdf, dashboard, reports, contracts, alerts, settings, portal, push, voice):
     api_router.include_router(r.router)
 
 app.include_router(api_router)

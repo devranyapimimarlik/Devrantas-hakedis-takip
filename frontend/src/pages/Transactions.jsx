@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { api, errMsg } from "@/lib/api";
 import { enqueue, isOffline, isNetworkError } from "@/lib/offline";
+import { VoiceExpense } from "@/components/shared/VoiceExpense";
 import { fmtTL, fmtDate, today, STATUS_LABELS } from "@/lib/format";
 import { PageHeader, StatusBadge, EmptyState, Field, Money } from "@/components/shared/Bits";
 import { NInput, NSelect, NTextarea, GoldButton, Chip } from "@/components/shared/Inputs";
@@ -52,7 +53,8 @@ export function TransactionForm({ defaults = {}, onDone }) {
   };
   const hasCek = f.kasa === "cek" || f.kasa === "karma";
   return (
-    <form onSubmit={submit} className="space-y-4" data-testid="transaction-form">
+    <form onSubmit={submit} className="space-y-4 min-w-0 max-w-full overflow-x-hidden" data-testid="transaction-form">
+      <VoiceExpense onResult={(r) => setF((p) => ({ ...p, type: r.type || p.type, category: r.category || p.category, amount: r.amount != null ? String(r.amount) : p.amount, site_id: r.site_id || p.site_id, account_id: r.account_id || "", kasa: r.kasa || p.kasa, description: r.description || p.description }))} />
       <div className="grid grid-cols-2 gap-2">
         {["gider", "gelir"].map((t) => <Chip key={t} active={f.type === t} onClick={() => setF({ ...f, type: t, category: t === "gider" ? "Malzeme" : "Hakediş Tahsilatı", account_id: "" })} className="w-full" data-testid={`tx-type-${t}`}>{t === "gider" ? "Ödeme (Gider)" : "Tahsilat (Gelir)"}</Chip>)}
       </div>
@@ -144,7 +146,7 @@ export default function Transactions() {
         </div>
       )}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle className="font-serif text-2xl">Yeni Gelir / Gider</DialogTitle></DialogHeader><TransactionForm onDone={() => setOpen(false)} /></DialogContent>
+        <DialogContent className="max-w-xl w-[calc(100vw-1rem)] sm:w-full max-h-[90vh] overflow-y-auto overflow-x-hidden"><DialogHeader><DialogTitle className="font-serif text-2xl">Yeni Gelir / Gider</DialogTitle></DialogHeader><TransactionForm onDone={() => setOpen(false)} /></DialogContent>
       </Dialog>
     </div>
   );
