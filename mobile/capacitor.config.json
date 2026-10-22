@@ -1,0 +1,24 @@
+{
+  "appId": "com.devrantas.yapi",
+  "appName": "Devrantaş",
+  "webDir": "www",
+  "server": {
+    "url": "https://hakedis-takip-3.preview.emergentagent.com",
+    "allowNavigation": ["*.emergentagent.com", "*.emergent.host"],
+    "cleartext": false
+  },
+  "ios": {
+    "contentInset": "automatic",
+    "backgroundColor": "#FDFBF7",
+    "preferredContentMode": "mobile"
+  },
+  "android": {
+    "backgroundColor": "#FDFBF7",
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "SplashScreen": { "launchShowDuration": 1200, "launchAutoHide": true, "backgroundColor": "#FDFBF7", "showSpinner": false },
+    "StatusBar": { "style": "LIGHT", "backgroundColor": "#FDFBF7" },
+    "PushNotifications": { "presentationOptions": ["badge", "sound", "alert"] }
+  }
+}

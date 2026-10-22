@@ -36,6 +36,7 @@ async def startup():
     await db.reminders.create_index([("remind_date", 1), ("dismissed", 1)])
     await db.transactions.create_index([("site_id", 1), ("status", 1)])
     await db.alert_logs.create_index("run_id", unique=True)
+    await push.load_apns_key_from_db()
     try:
         init_storage()
         logger.info("Storage initialized")

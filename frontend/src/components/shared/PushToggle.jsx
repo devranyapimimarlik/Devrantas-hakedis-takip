@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Bell, BellOff, BellRing, Loader2 } from "lucide-react";
 import { usePwaInstall } from "@/components/shared/PwaInstall";
+import { isNativeApp, registerNativePush, unregisterNativePush } from "@/lib/native";
 
 function b64ToUint8(s) {
   const pad = "=".repeat((4 - (s.length % 4)) % 4);
@@ -12,17 +13,23 @@ function b64ToUint8(s) {
 }
 
 export function usePush() {
-  const supported = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
-  const [permission, setPermission] = useState(supported ? Notification.permission : "unsupported");
-  const [subscribed, setSubscribed] = useState(false);
+  const native = isNativeApp();
+  const supported = native || ("serviceWorker" in navigator && "PushManager" in window && "Notification" in window);
+  const [permission, setPermission] = useState(native ? "default" : supported ? Notification.permission : "unsupported");
+  const [subscribed, setSubscribed] = useState(native ? !!localStorage.getItem("native_push_token") : false);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
-    if (!supported) return;
+    if (!supported || native) return;
     navigator.serviceWorker.ready.then((r) => r.pushManager.getSubscription()).then((s) => setSubscribed(!!s)).catch(() => {});
-  }, [supported]);
+  }, [supported, native]);
   const enable = async () => {
     setBusy(true);
     try {
+      if (native) {
+        const r = await registerNativePush();
+        if (!r.granted) { setPermission("denied"); toast.error("Bildirim izni verilmedi"); return false; }
+        setPermission("granted"); setSubscribed(true); toast.success("Bildirimler açıldı"); return true;
+      }
       const perm = await Notification.requestPermission();
       setPermission(perm);
       if (perm !== "granted") { toast.error("Bildirim izni verilmedi"); return false; }
@@ -38,6 +45,7 @@ export function usePush() {
   const disable = async () => {
     setBusy(true);
     try {
+      if (native) { await unregisterNativePush(); setSubscribed(false); toast.success("Bildirimler kapatıldı"); return; }
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.getSubscription();
       if (sub) { await api.post("/push/unsubscribe", { endpoint: sub.endpoint }); await sub.unsubscribe(); }
@@ -52,7 +60,7 @@ export function usePush() {
 export function PushToggle() {
   const { supported, permission, subscribed, busy, enable, disable, test } = usePush();
   const { isIOS, standalone } = usePwaInstall();
-  const iosBlocked = isIOS && !standalone;
+  const iosBlocked = isIOS && !standalone && !isNativeApp();
   return (
     <div className="gold-card p-5 space-y-3" data-testid="push-card">
       <div className="flex items-center gap-2">{subscribed ? <BellRing className="w-5 h-5 text-gold" /> : <Bell className="w-5 h-5 text-gold" />}<p className="font-semibold">Anlık Bildirimler</p></div>

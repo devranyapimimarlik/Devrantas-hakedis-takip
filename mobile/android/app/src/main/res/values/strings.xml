@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Devrantaş</string>
+    <string name="title_activity_main">Devrantaş</string>
+    <string name="package_name">com.devrantas.yapi</string>
+    <string name="custom_url_scheme">com.devrantas.yapi</string>
+</resources>

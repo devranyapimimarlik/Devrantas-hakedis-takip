@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Share, PlusSquare, Smartphone, Download, CheckCircle2, MoreVertical } from "lucide-react";
 import { useSettings } from "@/context/SettingsContext";
+import { isNativeApp } from "@/lib/native";
 import { Button } from "@/components/ui/button";
 
 let deferredPrompt = null;
@@ -12,7 +13,7 @@ export function usePwaInstall() {
   const ua = navigator.userAgent || "";
   const isIOS = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   const isAndroid = /Android/i.test(ua);
-  const [standalone, setStandalone] = useState(window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true);
+  const [standalone, setStandalone] = useState(isNativeApp() || window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true);
   const [canPrompt, setCanPrompt] = useState(!!deferredPrompt);
   useEffect(() => {
     const on = () => setCanPrompt(true);
@@ -51,7 +52,7 @@ export function InstallGuide({ compact = false }) {
   if (standalone) {
     return (
       <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4" data-testid="pwa-installed">
-        <CheckCircle2 className="w-6 h-6 text-emerald-600" /><p className="text-sm text-emerald-800">Uygulama ana ekranınıza kurulu. Tam ekran modunda çalışıyorsunuz.</p>
+        <CheckCircle2 className="w-6 h-6 text-emerald-600" /><p className="text-sm text-emerald-800">{isNativeApp() ? "Mağaza uygulamasını kullanıyorsunuz." : "Uygulama ana ekranınıza kurulu. Tam ekran modunda çalışıyorsunuz."}</p>
       </div>
     );
   }

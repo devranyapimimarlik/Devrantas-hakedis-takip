@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { NavLink, Outlet, useNavigate, Link } from "react-router-dom";
+import { isNativeApp, registerNativePush } from "@/lib/native";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
@@ -70,6 +71,7 @@ export default function AppLayout() {
   const brand = settings?.short_name || "Devrantaş";
   const nav = useNavigate();
   const [more, setMore] = useState(false);
+  useEffect(() => { if (isNativeApp()) registerNativePush(nav).catch(() => {}); }, [nav]);
   const { data: rem } = useQuery({ queryKey: ["reminders"], queryFn: () => api.get("/reminders").then((r) => r.data), refetchInterval: 60000 });
   const { data: pend } = useQuery({ queryKey: ["pending-count"], queryFn: () => api.get("/transactions", { params: { status: "onay_bekliyor" } }).then((r) => r.data.length), refetchInterval: 60000 });
 
