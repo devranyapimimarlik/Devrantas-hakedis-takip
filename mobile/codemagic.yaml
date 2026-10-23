@@ -1,0 +1,74 @@
+# Codemagic (https://codemagic.io) — Mac gerektirmeden App Store'a yükleme
+# Kurulum: Codemagic'te "Add application" → bu repoyu bağlayın → Team settings → Integrations → App Store Connect:
+#   Issuer ID, Key ID ve .p8 (App Store Connect API anahtarı; developer.apple.com → Users and Access → Integrations → App Store Connect API) girin.
+#   Code signing: "Automatic" seçin (Codemagic sertifika ve profilleri sizin adınıza oluşturur).
+# Ardından "Start new build" → workflow: ios-app-store. Bitince TestFlight'ta görünür.
+workflows:
+  ios-app-store:
+    name: Devrantaş iOS → App Store
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: Devrantas ASC   # Codemagic'te tanımladığınız App Store Connect entegrasyonunun adı
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.devrantas.yapi
+      vars:
+        XCODE_WORKSPACE: "ios/App/App.xcworkspace"
+        XCODE_SCHEME: "App"
+      node: 20
+      xcode: latest
+      cocoapods: default
+    working_directory: mobile
+    scripts:
+      - name: Bağımlılıklar
+        script: |
+          npm install
+          npx cap sync ios
+      - name: CocoaPods
+        script: |
+          cd ios/App && pod install
+      - name: Sertifika/profil
+        script: |
+          xcode-project use-profiles
+      - name: Sürüm numarası
+        script: |
+          cd ios/App
+          LATEST=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || echo 0)
+          agvtool new-version -all $((LATEST + 1))
+      - name: Derle (IPA)
+        script: |
+          xcode-project build-ipa --workspace "$XCODE_WORKSPACE" --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        submit_to_app_store: false   # İlk incelemeden sonra true yapabilirsiniz
+
+  android-play-store:
+    name: Devrantaş Android → Google Play
+    max_build_duration: 60
+    instance_type: linux_x2
+    environment:
+      android_signing:
+        - devrantas_keystore          # Codemagic → Code signing identities → Android keystore adı
+      node: 20
+      java: 17
+    working_directory: mobile
+    scripts:
+      - name: Bağımlılıklar
+        script: |
+          npm install
+          npx cap sync android
+      - name: Derle (AAB)
+        script: |
+          cd android && ./gradlew bundleRelease
+    artifacts:
+      - android/app/build/outputs/**/*.aab
+    publishing:
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS   # Play Console servis hesabı JSON'u (Codemagic env var)
+        track: internal

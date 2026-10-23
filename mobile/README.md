@@ -24,6 +24,15 @@ npx cap sync           # eklentileri iOS/Android projelerine işler
 
 ## 1. iOS — App Store
 
+### Seçenek A (Mac yoksa): Codemagic ile bulutta derle ve gönder — ÖNERİLEN
+1. Sohbetteki **"Save to GitHub"** ile projeyi GitHub'a kaydedin.
+2. https://codemagic.io → GitHub ile giriş → **Add application** → bu repoyu seçin → "codemagic.yaml" yapılandırmasını kullan (dosya `mobile/codemagic.yaml`).
+3. **Teams → Integrations → App Store Connect** → App Store Connect API anahtarı ekleyin (developer.apple.com → Users and Access → Integrations → App Store Connect API → **Generate API Key**, rol: App Manager; Issuer ID + Key ID + .p8). Entegrasyon adını `Devrantas ASC` yapın.
+4. App Store Connect'te https://appstoreconnect.apple.com → **My Apps → +** → Ad: Devrantaş, Bundle ID: `com.devrantas.yapi` (önce developer.apple.com → Identifiers'da aynı ID'yi oluşturun, Push Notifications işaretli).
+5. Codemagic → **Start new build** → workflow `ios-app-store`. 15–25 dk sonra uygulama **TestFlight**'ta görünür; TestFlight uygulamasıyla telefonunuza kurun.
+6. Mağaza metinleri `mobile/APP_STORE_LISTING.md` dosyasında hazır; App Store Connect'e yapıştırıp **Submit for Review** deyin.
+
+### Seçenek B (Mac var): Xcode ile
 ### 1.1 Xcode'da aç
 ```bash
 npx cap open ios
@@ -39,7 +48,7 @@ npx cap open ios
 3. Emergent sohbetinde "Apple push anahtarlarını ekle" deyin; güvenli kart üzerinden şu değerler istenecek:
    - `APNS_KEY_ID`, `APNS_TEAM_ID` (Team ID ≠ Key ID; Membership details sayfasında)
    - `APNS_BUNDLE_ID` → `com.devrantas.yapi`
-   - `APNS_USE_SANDBOX` → TestFlight/Xcode denemelerinde `true`, App Store yayınında `false`
+   - `APNS_USE_SANDBOX` → yalnızca Xcode ile kabloyla kurulan denemede `true`; **TestFlight ve App Store için `false`**
    - .p8 dosyasını metin olarak kopyalamak yerine uygulama içinden yükleyin: **Diğer → Telefona kur → "iPhone Bildirim Anahtarı" → .p8 dosyasını yükle** (yönetici).
 
 ### 1.3 Test ve yayın
@@ -74,6 +83,6 @@ Yalnızca logo, adres (`server.url`) veya native eklenti değişince yeni sürü
 
 ## 4. Sık sorunlar
 - *Beyaz ekran / açılmıyor:* `server.url` erişilebilir mi? Önizleme adresi değiştiyse güncelleyip `npx cap sync` yapın.
-- *iOS'ta bildirim gelmiyor:* Xcode'da Push Notifications capability eklendi mi, `APNS_USE_SANDBOX` değeri derleme tipine (Debug/TestFlight=true, App Store=false) uygun mu?
+- *iOS'ta bildirim gelmiyor:* Xcode'da Push Notifications capability eklendi mi, `APNS_USE_SANDBOX` değeri doğru mu? (Xcode debug=true, TestFlight ve App Store=false)
 - *Android'de bildirim gelmiyor:* `google-services.json` doğru klasörde mi, `FIREBASE_SERVICE_ACCOUNT_JSON` eklendi mi?
 - *Mikrofon/kamera çalışmıyor:* İlk kullanımda izin isteği çıkar; reddedildiyse telefon Ayarlar → Devrantaş'tan açın.
