@@ -37,10 +37,10 @@ npx cap open ios
 1. https://developer.apple.com/account/resources/authkeys → **+** → *Apple Push Notifications service (APNs)* işaretle → indir (`AuthKey_XXXXXXXXXX.p8`). **Bu dosya yalnızca bir kez indirilir, saklayın.**
 2. Key ID (10 karakter) ve Team ID (Membership sayfasında) değerlerini not edin.
 3. Emergent sohbetinde "Apple push anahtarlarını ekle" deyin; güvenli kart üzerinden şu değerler istenecek:
-   - `APNS_KEY_P8` → .p8 dosyasının içeriği (tamamı, BEGIN/END satırları dahil)
-   - `APNS_KEY_ID`, `APNS_TEAM_ID`
+   - `APNS_KEY_ID`, `APNS_TEAM_ID` (Team ID ≠ Key ID; Membership details sayfasında)
    - `APNS_BUNDLE_ID` → `com.devrantas.yapi`
    - `APNS_USE_SANDBOX` → TestFlight/Xcode denemelerinde `true`, App Store yayınında `false`
+   - .p8 dosyasını metin olarak kopyalamak yerine uygulama içinden yükleyin: **Diğer → Telefona kur → "iPhone Bildirim Anahtarı" → .p8 dosyasını yükle** (yönetici).
 
 ### 1.3 Test ve yayın
 - iPhone'u bağlayın → Xcode'da cihazı seçin → **▶ Run**. Uygulama açılır, bildirim izni sorar.
