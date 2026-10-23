@@ -114,7 +114,11 @@ async def build_daily_summary() -> dict:
 
 
 def twilio_configured() -> bool:
-    return bool(os.environ.get("TWILIO_ACCOUNT_SID") and os.environ.get("TWILIO_AUTH_TOKEN") and (os.environ.get("TWILIO_WHATSAPP_FROM") or os.environ.get("TWILIO_SMS_FROM")))
+    sid = os.environ.get("TWILIO_ACCOUNT_SID", "").strip()
+    tok = os.environ.get("TWILIO_AUTH_TOKEN", "").strip()
+    wa = os.environ.get("TWILIO_WHATSAPP_FROM", "").strip()
+    sms = os.environ.get("TWILIO_SMS_FROM", "").strip()
+    return sid.startswith("AC") and len(sid) == 34 and len(tok) >= 32 and (wa.replace("whatsapp:", "").startswith("+") or sms.startswith("+"))
 
 
 def send_twilio(message: str, to: str) -> dict:

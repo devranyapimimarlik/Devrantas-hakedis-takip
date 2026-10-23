@@ -3,8 +3,11 @@
   "appName": "Devrantaş",
   "webDir": "www",
   "server": {
-    "url": "https://hakedis-takip-3.preview.emergentagent.com",
-    "allowNavigation": ["*.emergentagent.com", "*.emergent.host"],
+    "url": "https://hakedis-takip-3.emergent.host",
+    "allowNavigation": [
+      "*.emergent.host",
+      "*.emergentagent.com"
+    ],
     "cleartext": false
   },
   "ios": {
@@ -17,8 +20,22 @@
     "allowMixedContent": false
   },
   "plugins": {
-    "SplashScreen": { "launchShowDuration": 1200, "launchAutoHide": true, "backgroundColor": "#FDFBF7", "showSpinner": false },
-    "StatusBar": { "style": "LIGHT", "backgroundColor": "#FDFBF7" },
-    "PushNotifications": { "presentationOptions": ["badge", "sound", "alert"] }
+    "SplashScreen": {
+      "launchShowDuration": 1200,
+      "launchAutoHide": true,
+      "backgroundColor": "#FDFBF7",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "LIGHT",
+      "backgroundColor": "#FDFBF7"
+    },
+    "PushNotifications": {
+      "presentationOptions": [
+        "badge",
+        "sound",
+        "alert"
+      ]
+    }
   }
 }

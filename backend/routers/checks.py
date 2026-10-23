@@ -149,6 +149,43 @@ class PaymentIn(BaseModel):
     notes: Optional[str] = ""
 
 
+@router.get("/calendar")
+async def calendar(month: str, user=Depends(get_current_user)):
+    try:
+        y, m = (int(x) for x in month.split("-")[:2])
+        start = date(y, m, 1)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Ay formatı YYYY-MM olmalı")
+    end = date(y + (m // 12), (m % 12) + 1, 1)
+    rng = {"$gte": start.isoformat(), "$lt": end.isoformat()}
+    sites = {s["id"]: s["name"] async for s in db.sites.find({}, {"_id": 0, "id": 1, "name": 1})}
+    accounts = {a["id"]: a["name"] async for a in db.accounts.find({}, {"_id": 0, "id": 1, "name": 1})}
+    items = []
+    async for c in db.checks.find({"due_date": rng}, {"_id": 0}):
+        items.append({"id": c["id"], "kind": "cek", "direction": c["direction"], "date": c["due_date"], "amount": c["amount"], "status": c["status"],
+                      "title": f"{'Alınan' if c['direction'] == 'alinan' else 'Verilen'} çek · {c.get('bank') or ''} {c.get('check_no') or ''}".strip(),
+                      "party": accounts.get(c.get("account_id")) or c.get("drawer") or c.get("endorsed_to_name") or "", "site": sites.get(c.get("site_id")) or "",
+                      "open": c["status"] == "portfoyde"})
+    async for p in db.payments.find({"due_date": rng}, {"_id": 0}):
+        items.append({"id": p["id"], "kind": p.get("type") or "diger", "direction": "verilen", "date": p["due_date"], "amount": p["amount"], "status": p["status"],
+                      "title": p["title"], "party": p.get("notes") or "", "site": "", "open": p["status"] == "bekliyor"})
+    items.sort(key=lambda x: (x["date"], -x["amount"]))
+    today = date.today().isoformat()
+    for it in items:
+        it["days_left"] = (date.fromisoformat(it["date"]) - date.today()).days
+    days = {}
+    for it in items:
+        d = days.setdefault(it["date"], {"date": it["date"], "in": 0.0, "out": 0.0, "count": 0, "open": 0})
+        d["count"] += 1
+        d["open"] += 1 if it["open"] else 0
+        if it["open"]:
+            d["in" if it["direction"] == "alinan" else "out"] += float(it["amount"] or 0)
+    tot_in = sum(d["in"] for d in days.values())
+    tot_out = sum(d["out"] for d in days.values())
+    return {"month": f"{y:04d}-{m:02d}", "today": today, "days": sorted(days.values(), key=lambda d: d["date"]), "items": items,
+            "totals": {"in": tot_in, "out": tot_out, "net": tot_in - tot_out, "open_count": sum(1 for i in items if i["open"])}}
+
+
 @router.get("/payments")
 async def list_payments(status: Optional[str] = None, user=Depends(get_current_user)):
     q = {"status": status} if status else {}

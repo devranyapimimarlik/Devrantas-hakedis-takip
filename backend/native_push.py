@@ -20,7 +20,13 @@ def set_apns_pem(pem: Optional[str]):
 
 
 def fcm_configured() -> bool:
-    return bool(os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON"))
+    return bool(_fcm.get("json_override") or os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON"))
+
+
+def set_fcm_json(raw: Optional[str]):
+    _fcm["json_override"] = raw
+    _fcm["creds"] = None
+    _fcm["project"] = None
 
 
 def _apns_client():
@@ -50,7 +56,7 @@ def _fcm_token() -> tuple:
     from google.oauth2 import service_account
     from google.auth.transport.requests import Request
     if _fcm["creds"] is None:
-        info = json.loads(os.environ["FIREBASE_SERVICE_ACCOUNT_JSON"])
+        info = json.loads(_fcm.get("json_override") or os.environ["FIREBASE_SERVICE_ACCOUNT_JSON"])
         _fcm["creds"] = service_account.Credentials.from_service_account_info(info, scopes=["https://www.googleapis.com/auth/firebase.messaging"])
         _fcm["project"] = info["project_id"]
     if not _fcm["creds"].valid:

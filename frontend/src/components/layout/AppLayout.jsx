@@ -10,7 +10,7 @@ import { STATUS_LABELS } from "@/lib/format";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
   LayoutGrid, Building2, Users, HardHat, ReceiptText, FileText, BarChart3, Menu, LogOut, Bell,
-  FileSignature, Banknote, CalendarClock, Sparkles, ShieldCheck, Wallet, Activity, UserCog, KeyRound, Palette, Smartphone,
+  FileSignature, Banknote, CalendarClock, Sparkles, ShieldCheck, Wallet, Activity, UserCog, KeyRound, Palette, Smartphone, CalendarDays,
 } from "lucide-react";
 import { InstallBanner } from "@/components/shared/PwaInstall";
 import { OfflineBar } from "@/components/shared/OfflineQueue";
@@ -31,6 +31,7 @@ const MORE = [
   { to: "/sozlesmeler", label: "Sözleşmeler", icon: FileSignature, id: "contracts" },
   { to: "/hakedis", label: "Hakedişler", icon: FileText, id: "progress" },
   { to: "/cekler", label: "Çekler", icon: Banknote, id: "checks" },
+  { to: "/takvim", label: "Vade Takvimi", icon: CalendarDays, id: "calendar" },
   { to: "/odeme-takvimi", label: "Sabit Giderler (SSK, kredi, kira)", icon: CalendarClock, id: "payments" },
   { to: "/raporlar?tab=kasa", label: "Kasa / Banka", icon: Wallet, id: "cash" },
   { to: "/raporlar?tab=para_akisi", label: "Para Akışı", icon: Activity, id: "cashflow" },

@@ -115,14 +115,39 @@ async def remove_device(data: UnsubIn, user=Depends(get_current_user)):
 async def native_config(user=Depends(get_current_user)):
     from native_push import apns_configured, fcm_configured
     doc = await db.settings.find_one({"id": "apns_key"}, {"_id": 0, "filename": 1, "updated_at": 1})
-    return {"ios": apns_configured(), "android": fcm_configured(), "apns_key_file": doc, "sandbox": os.environ.get("APNS_USE_SANDBOX", "true").lower() == "true",
+    fdoc = await db.settings.find_one({"id": "fcm_key"}, {"_id": 0, "filename": 1, "updated_at": 1, "project_id": 1})
+    return {"ios": apns_configured(), "android": fcm_configured(), "apns_key_file": doc, "fcm_key_file": fdoc, "sandbox": os.environ.get("APNS_USE_SANDBOX", "true").lower() == "true",
             "key_id_set": bool(os.environ.get("APNS_KEY_ID")), "team_id_set": bool(os.environ.get("APNS_TEAM_ID"))}
 
 
 async def load_apns_key_from_db():
-    from native_push import set_apns_pem
+    from native_push import set_apns_pem, set_fcm_json
     doc = await db.settings.find_one({"id": "apns_key"}, {"_id": 0, "pem": 1})
     set_apns_pem(doc["pem"] if doc else None)
+    fdoc = await db.settings.find_one({"id": "fcm_key"}, {"_id": 0, "raw": 1})
+    set_fcm_json(fdoc["raw"] if fdoc else None)
+
+
+@router.post("/fcm-key")
+async def upload_fcm_key(file: UploadFile = File(...), user=Depends(require_role("yonetici"))):
+    from native_push import set_fcm_json
+    raw = (await file.read()).decode("utf-8", "ignore").strip()
+    try:
+        info = json.loads(raw)
+        assert info.get("type") == "service_account" and info.get("project_id") and info.get("private_key") and info.get("client_email")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Geçerli bir Firebase servis hesabı JSON dosyası değil. Firebase → Proje Ayarları → Servis hesapları → 'Yeni özel anahtar oluştur' ile indirin.")
+    await db.settings.update_one({"id": "fcm_key"}, {"$set": {"raw": raw, "filename": file.filename, "project_id": info["project_id"], "updated_at": now_iso(), "uploaded_by": user["id"]}}, upsert=True)
+    set_fcm_json(raw)
+    return {"ok": True, "filename": file.filename, "project_id": info["project_id"]}
+
+
+@router.delete("/fcm-key")
+async def delete_fcm_key(user=Depends(require_role("yonetici"))):
+    from native_push import set_fcm_json
+    await db.settings.delete_one({"id": "fcm_key"})
+    set_fcm_json(None)
+    return {"ok": True}
 
 
 @router.post("/apns-key")

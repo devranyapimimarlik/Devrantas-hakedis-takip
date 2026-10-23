@@ -21,6 +21,7 @@ import Proposals from "@/pages/Proposals";
 import Contracts from "@/pages/Contracts";
 import Checks from "@/pages/Checks";
 import Payments from "@/pages/Payments";
+import Calendar from "@/pages/Calendar";
 import Reports from "@/pages/Reports";
 import AiAssistant from "@/pages/AiAssistant";
 import { Users, ChangePassword } from "@/pages/Admin";
@@ -61,6 +62,7 @@ export default function App() {
             <Route path="/sozlesmeler" element={<Contracts />} />
             <Route path="/cekler" element={<Checks />} />
             <Route path="/odeme-takvimi" element={<Payments />} />
+            <Route path="/takvim" element={<Calendar />} />
             <Route path="/raporlar" element={<Reports />} />
             <Route path="/asistan" element={<AiAssistant />} />
             <Route path="/yonetim/kullanicilar" element={<Protected admin><Users /></Protected>} />

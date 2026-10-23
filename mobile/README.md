@@ -16,7 +16,7 @@ npm install            # veya yarn
 npx cap sync           # eklentileri iOS/Android projelerine işler
 ```
 
-**Adres değişikliği:** `capacitor.config.json` → `server.url` değerini yayınlanmış (Deploy) kalıcı adresinizle değiştirin, sonra `npx cap sync`.
+**Adres:** `capacitor.config.json` → `server.url` = `https://hakedis-takip-3.emergent.host` (yayınlanmış kalıcı adres). Değiştirirseniz `npx cap sync` çalıştırın.
 
 **Logo değişikliği:** `assets/icon-only.png`, `assets/icon-foreground.png`, `assets/splash.png` dosyalarını güncelleyip `npm run assets` çalıştırın.
 
