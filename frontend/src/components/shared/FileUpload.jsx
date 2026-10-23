@@ -77,7 +77,7 @@ export function SecureImage({ fileId, className, alt = "Ek" }) {
 
 export function AttachmentButton({ fileId, testId }) {
   const [open, setOpen] = useState(false);
-  if (!fileId) return <span className="text-xs text-charcoal-muted">-</span>;
+  if (!fileId) return null;
   return (
     <>
       <button onClick={() => setOpen(true)} className="inline-flex items-center gap-1 text-xs text-gold hover:underline" data-testid={testId}>

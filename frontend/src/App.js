@@ -65,6 +65,7 @@ export default function App() {
             <Route path="/takvim" element={<Calendar />} />
             <Route path="/raporlar" element={<Reports />} />
             <Route path="/asistan" element={<AiAssistant />} />
+            <Route path="/yonetim" element={<Navigate to="/yonetim/kullanicilar" replace />} />
             <Route path="/yonetim/kullanicilar" element={<Protected admin><Users /></Protected>} />
             <Route path="/sifre" element={<ChangePassword />} />
             <Route path="/ayarlar/gorunum" element={<Protected admin><Appearance /></Protected>} />

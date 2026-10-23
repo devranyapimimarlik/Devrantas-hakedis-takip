@@ -15,7 +15,7 @@ export function DataTransfer() {
   const [src, setSrc] = useState({ source_url: SRC_DEFAULT, email: "", password: "" });
   const [preview, setPreview] = useState(null);
   const { data: stats } = useQuery({ queryKey: ["admin-stats"], queryFn: () => api.get("/admin/stats").then((r) => r.data) });
-  const done = (counts, msg) => { qc.invalidateQueries(); setPreview(null); toast.success(`${msg}: ${Object.entries(counts).filter(([k]) => LABELS[k]).map(([k, v]) => `${v} ${LABELS[k].toLowerCase()}`).join(", ")}`); };
+  const done = (counts, msg) => { qc.invalidateQueries(); setPreview(null); toast.success(`${msg}: ${Object.entries(counts).filter(([k]) => LABELS[k]).map(([k, v]) => `${v} ${LABELS[k].toLocaleLowerCase('tr-TR')}`).join(", ")}`); };
   const pullPreview = useMutation({ mutationFn: () => api.post("/admin/pull", { ...src, dry_run: true }).then((r) => r.data.preview), onSuccess: setPreview, onError: (e) => toast.error(errMsg(e)) });
   const pull = useMutation({ mutationFn: () => api.post("/admin/pull", src).then((r) => r.data.counts), onSuccess: (c) => done(c, "Veriler aktarıldı"), onError: (e) => toast.error(errMsg(e)) });
   const imp = useMutation({
@@ -35,7 +35,7 @@ export function DataTransfer() {
   return (
     <div className="gold-card p-5 space-y-5 mt-8" data-testid="data-transfer-card">
       <div className="flex items-center gap-2"><Database className="w-5 h-5 text-gold" /><h3 className="font-serif text-xl font-bold">Veri Taşıma ve Yedek</h3></div>
-      {stats && <p className="text-xs text-charcoal-light" data-testid="data-stats">Bu uygulamada: {Object.entries(stats).filter(([k]) => LABELS[k]).map(([k, v]) => `${v} ${LABELS[k].toLowerCase()}`).join(" · ")}{stats.test_records > 0 && <span className="text-amber-700"> · {stats.test_records} TEST_ kaydı var</span>}</p>}
+      {stats && <p className="text-xs text-charcoal-light" data-testid="data-stats">Bu uygulamada: {Object.entries(stats).filter(([k]) => LABELS[k]).map(([k, v]) => `${v} ${LABELS[k].toLocaleLowerCase('tr-TR')}`).join(" · ")}{stats.test_records > 0 && <span className="text-amber-700"> · {stats.test_records} TEST_ kaydı var</span>}</p>}
 
       <div className="rounded-2xl border border-gold-border p-4 space-y-3" data-testid="pull-section">
         <p className="font-semibold text-sm flex items-center gap-2"><ArrowRightLeft className="w-4 h-4 text-gold" />Diğer uygulamadan verileri buraya aktar</p>
@@ -48,7 +48,7 @@ export function DataTransfer() {
         {preview && (
           <div className="rounded-xl bg-gold-bg p-3 text-sm" data-testid="pull-preview">
             <p className="font-semibold mb-1">Kaynakta bulunan veriler:</p>
-            <p className="text-xs text-charcoal-light">{Object.entries(preview).filter(([k]) => LABELS[k]).map(([k, v]) => `${v} ${LABELS[k].toLowerCase()}`).join(" · ")}</p>
+            <p className="text-xs text-charcoal-light">{Object.entries(preview).filter(([k]) => LABELS[k]).map(([k, v]) => `${v} ${LABELS[k].toLocaleLowerCase('tr-TR')}`).join(" · ")}</p>
           </div>
         )}
         <div className="flex flex-wrap gap-2">

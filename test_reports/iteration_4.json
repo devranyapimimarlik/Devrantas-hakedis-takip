@@ -1,0 +1,42 @@
+{
+  "summary": "Bug-fix verification after code review. Backend: 16/16 pytest pass (hakediş pay nakit/çek/draft-guard/auto-close to odendi, check endorse with/without hakediş + guards, client_key idempotency, import validation (missing collection / doc without id / non-JSON -> 400, stats + restore_points unchanged), export v1 with all 15 collections, pull dry_run against self returns preview with no data change, pull bad creds 400, non-admin 403 on export/stats/import/pull). Frontend (mobile 390x844): SW CacheStorage contains only '/', /api/settings/manifest.json, /api/settings/logo (no authenticated /api entries); /islemler pending row shows amount top-right and approve/reject buttons for admin, no horizontal overflow; /takvim renders calendar-page + cal-grid, clicking a day opens cal-day-sheet with the right item; /telefona-kur shows push-card, apns-key-card, fcm-key-card; admin page shows data-transfer-card and export-button (export download works); logout goes to /giris and clears dvt_token. All TEST_ data was cleaned up (admin stats are identical to the starting values).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "DELETE /api/transactions/{id} (endorsement tx)", "issue": "endorse_check sets check_id=<received check id> on the endorsement transaction. delete_tx then deletes the ORIGINAL received check and its reminders (db.checks.delete_one({'id': t['check_id']})) instead of reverting it to 'portfoyde'. Deleting a ciro transaction makes the received check disappear."},
+      {"endpoint": "POST /api/transactions/{id}/reject (endorsement tx)", "issue": "If a ciro transaction (onay_bekliyor) is rejected, the check stays 'ciro_edildi' with endorsed_to set. It should revert to portfoyde, or the check should only become ciro_edildi after approval."},
+      {"endpoint": "POST /api/transactions client_key", "issue": "The dedup is a find_one followed by an insert, with no unique index on (created_by, client_key). Two concurrent offline-queue flushes can still create duplicates. Add a partial unique index and handle DuplicateKeyError."},
+      {"endpoint": "DELETE /api/progress-payments/{pid}", "issue": "Does not cascade or unlink transactions that carry progress_payment_id, which leaves orphan links."},
+      {"endpoint": "apply_import", "issue": "The restore point is stored as a single JSON string in one Mongo document, so it will fail at the 16MB BSON limit as the data grows (blobs are excluded, which helps). There is also a non-atomic window between db[c].drop() and the rename."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "DataTransfer stats/preview/toast", "issue": "LABELS[k].toLowerCase() on 'İşlem' renders 'i̇şlem' (a dotted-i combining character). Use toLocaleLowerCase('tr-TR').", "selector": "[data-testid='data-stats']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/islemler mobile row", "issues": ["The status badge is followed by a dangling '-' separator when there is no approver"]},
+      {"screen": "Routing", "issues": ["/yonetim alone redirects to '/'. The admin page lives at /yonetim/kullanicilar. Consider redirecting /yonetim to /yonetim/kullanicilar."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iteration4_bugfixes.py", "/app/test_reports/pytest/pytest_iteration4.xml"],
+  "action_items": [
+    "delete_tx: for endorsement transactions (endorsed=True), revert the check to portfoyde and clear endorsed_* instead of deleting the received check",
+    "Reject flow: revert the endorsed check status when its transaction is rejected",
+    "Add a unique partial index on transactions(created_by, client_key) to make the dedup race-safe",
+    "Use toLocaleLowerCase('tr-TR') in DataTransfer labels",
+    "Optional: redirect /yonetim to /yonetim/kullanicilar"
+  ],
+  "critical_code_review_comments": [
+    "pay_progress and endorse_check now pass BackgroundTasks correctly. This is verified fixed (201, no 500s).",
+    "sw.js correctly bypasses non-public /api GETs. Logout posts clear-cache. The cache key 'devrantas-v3' reappears after logout because the /giris navigation re-caches '/', which is harmless.",
+    "The test file must be run with -n 0 (serially) because pytest.ini enables xdist, and parallel workers make the admin-stats before/after equality checks fail."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration4_bugfixes.py"],
+  "success_rate": {"backend": "100% (16/16)", "frontend": "100% of requested checks"},
+  "seed_data_creation": "Temporary TEST_ site, account, hakedişler, checks, transactions and sub-user were created and all deleted. Final stats match the starting values (checks=0, transactions=26, test_records=0, users=6).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: REACT_APP_BACKEND_URL=... pytest tests/test_iteration4_bugfixes.py -n 0. The real-data DB is never mutated except for TEST_ records. Import tests only send invalid payloads. The server date is 2026-10-23. The admin data-transfer UI is at /yonetim/kullanicilar."
+}

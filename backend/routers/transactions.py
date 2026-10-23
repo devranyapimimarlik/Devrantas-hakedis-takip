@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import Optional
 from core import db, get_current_user, require_role, new_id, now_iso
 from routers.push import send_push
+from pymongo.errors import DuplicateKeyError
 
 
 def tl(v) -> str:
@@ -97,6 +98,8 @@ async def create_transaction(data: TransactionIn, background: BackgroundTasks, u
         if existing:
             sites, accounts = await _lookups()
             return await _enrich(existing, sites, accounts)
+    else:
+        data.client_key = None
     status = "onaylandi" if data.type == "gelir" else "onay_bekliyor"
     doc = {"id": new_id(), **data.model_dump(), "status": status, "created_by": user["id"],
            "created_by_name": user["name"], "created_at": now_iso(), "approved_by": None, "approved_at": None,
@@ -115,7 +118,12 @@ async def create_transaction(data: TransactionIn, background: BackgroundTasks, u
         label = "Alınan Çek" if chk["direction"] == "alinan" else "Verilen Çek"
         await create_reminders("cek", chk["id"], f"{label} - {chk['bank']} {chk['check_no']}".strip(), data.amount, data.check_due_date)
         doc["check_id"] = chk["id"]
-    await db.transactions.insert_one(doc)
+    try:
+        await db.transactions.insert_one(doc)
+    except DuplicateKeyError:
+        existing = await db.transactions.find_one({"client_key": data.client_key, "created_by": user["id"]}, {"_id": 0})
+        sites, accounts = await _lookups()
+        return await _enrich(existing, sites, accounts)
     doc.pop("_id", None)
     sites, accounts = await _lookups()
     enriched = await _enrich(doc, sites, accounts)
@@ -149,7 +157,9 @@ async def reject(tx_id: str, data: RejectIn, background: BackgroundTasks, user=D
                                                      "reject_reason": data.reason}})
     if not res.matched_count:
         raise HTTPException(status_code=404, detail="Onay bekleyen işlem bulunamadı")
-    t = await db.transactions.find_one({"id": tx_id}, {"_id": 0, "created_by": 1, "amount": 1, "category": 1})
+    t = await db.transactions.find_one({"id": tx_id}, {"_id": 0, "created_by": 1, "amount": 1, "category": 1, "check_id": 1, "endorsed": 1})
+    if t and t.get("endorsed") and t.get("check_id"):
+        await _revert_endorsement(t["check_id"])
     if t and t.get("created_by") != user["id"]:
         background.add_task(send_push, [t["created_by"]], "Gider reddedildi", f"{tl(t['amount'])} · {t['category']} — {data.reason or 'gerekçe yok'}", "/islemler", f"tx-{tx_id}")
     return {"ok": True}
@@ -164,6 +174,14 @@ async def delete_tx(tx_id: str, user=Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Onaylı işlemi sadece yönetici silebilir")
     await db.transactions.delete_one({"id": tx_id})
     if t.get("check_id"):
-        await db.checks.delete_one({"id": t["check_id"]})
-        await db.reminders.delete_many({"source_id": t["check_id"]})
+        if t.get("endorsed"):
+            await _revert_endorsement(t["check_id"])
+        else:
+            await db.checks.delete_one({"id": t["check_id"]})
+            await db.reminders.delete_many({"source_id": t["check_id"]})
     return {"ok": True}
+
+
+async def _revert_endorsement(check_id: str):
+    await db.checks.update_one({"id": check_id, "status": "ciro_edildi"}, {"$set": {"status": "portfoyde"},
+                               "$unset": {"endorsed_to": "", "endorsed_to_name": "", "endorsed_at": "", "endorse_transaction_id": ""}})
