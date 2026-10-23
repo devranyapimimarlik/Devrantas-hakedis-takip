@@ -61,6 +61,15 @@
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: rgb(var(--gold-border)); border-radius: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
+@media (max-width: 767px) {
+  .overflow-x-auto { scrollbar-width: none; -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity; }
+  .overflow-x-auto::-webkit-scrollbar { display: none; }
+  .overflow-x-auto > * { scroll-snap-align: start; }
+  input, select, textarea { font-size: 16px !important; }
+}
+@supports (padding: max(0px)) {
+  .pt-safe { padding-top: max(0.5rem, env(safe-area-inset-top)); }
+}
 
 @layer base {
     [data-debug-wrapper="true"] { display: contents !important; }

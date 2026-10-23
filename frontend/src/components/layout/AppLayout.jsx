@@ -20,7 +20,7 @@ const TABS = [
   { to: "/santiyeler", label: "Şantiye", icon: Building2, id: "sites" },
   { to: "/cari/musteri", label: "Müşteri", icon: Users, id: "customers" },
   { to: "/cari/taseron", label: "Taşeron", icon: HardHat, id: "subcontractors" },
-  { to: "/islemler", label: "Gelir-Gider", icon: ReceiptText, id: "transactions" },
+  { to: "/islemler", label: "İşlemler", icon: ReceiptText, id: "transactions" },
   { to: "/hakedis", label: "Hakediş", icon: FileText, id: "progress" },
   { to: "/raporlar", label: "Raporlar", icon: BarChart3, id: "reports" },
 ];
@@ -113,7 +113,7 @@ export default function AppLayout() {
               <Bell className="w-5 h-5 text-charcoal-light" />
               {rem?.total > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-mono flex items-center justify-center">{rem.total}</span>}
             </button>
-            <p className="text-sm text-charcoal-light truncate max-w-[200px] md:max-w-none" data-testid="user-email">{user?.email}</p>
+            <p className="hidden sm:block text-sm text-charcoal-light truncate max-w-[200px] md:max-w-none" data-testid="user-email">{user?.email}</p>
             <button onClick={() => setMore(true)} className="hidden lg:inline-flex p-2 rounded-full hover:bg-gold-bg" data-testid="desktop-more-button"><Menu className="w-5 h-5" /></button>
           </div>
         </header>

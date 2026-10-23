@@ -41,9 +41,9 @@ export function DocHeader({ title }) {
   const short = settings?.short_name || "";
   return (
     <>
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3"><img src={logoUrl} alt={short} className="w-14 h-14 rounded-full object-contain" /><div><p className="font-serif text-2xl font-bold tracking-wide uppercase">{short}</p><p className="text-[11px] text-charcoal-light tracking-wider uppercase">{name.replace(new RegExp("^" + short, "i"), "").trim()}</p></div></div>
-        <p className="font-serif text-2xl md:text-3xl text-gold font-bold">{title}</p>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3 min-w-0"><img src={logoUrl} alt={short} className="w-12 h-12 md:w-14 md:h-14 rounded-full object-contain shrink-0" /><div className="min-w-0"><p className="font-serif text-xl md:text-2xl font-bold tracking-wide uppercase truncate">{short}</p><p className="text-[10px] md:text-[11px] text-charcoal-light tracking-wider uppercase truncate">{name.replace(new RegExp("^" + short, "i"), "").trim()}</p></div></div>
+        <p className="font-serif text-xl md:text-3xl text-gold font-bold ml-auto">{title}</p>
       </div>
       <div className="border-t-2 border-gold my-5" />
     </>

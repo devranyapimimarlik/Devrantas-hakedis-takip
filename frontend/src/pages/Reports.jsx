@@ -13,9 +13,9 @@ const TABS = [["kasa", "Kasa"], ["musteri_risk", "Müşteri Risk"], ["cek", "Çe
 
 function Row({ label, value, bold, sub, neg }) {
   return (
-    <div className={`flex items-center justify-between py-3 border-b border-stone-100 last:border-0 ${bold ? "font-semibold text-base" : "text-sm"}`}>
-      <div><p>{label}</p>{sub && <p className="text-xs text-charcoal-muted">{sub}</p>}</div>
-      <span className={`money ${neg ? "text-red-700" : bold ? "text-charcoal" : ""}`}>{typeof value === "number" ? fmtTL(value) : value}</span>
+    <div className={`flex items-center justify-between gap-3 py-3 border-b border-stone-100 last:border-0 ${bold ? "font-semibold text-base" : "text-sm"}`}>
+      <div className="min-w-0"><p>{label}</p>{sub && <p className="text-xs text-charcoal-muted">{sub}</p>}</div>
+      <span className={`money whitespace-nowrap shrink-0 ${neg ? "text-red-700" : bold ? "text-charcoal" : ""}`}>{typeof value === "number" ? fmtTL(value) : value}</span>
     </div>
   );
 }

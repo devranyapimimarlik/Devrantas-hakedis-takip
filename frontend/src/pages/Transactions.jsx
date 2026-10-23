@@ -122,8 +122,8 @@ export default function Transactions() {
       {isLoading ? <div className="h-40 animate-pulse bg-white/60 rounded-2xl" /> : rows.length === 0 ? <EmptyState title="İşlem yok" testId="transactions-empty" /> : (
         <div className="space-y-3" data-testid="transactions-list">
           {rows.map((t) => (
-            <div key={t.id} className="gold-card p-4 flex flex-col sm:flex-row sm:items-center gap-3" data-testid={`tx-row-${t.id}`}>
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${t.type === "gelir" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>{t.type === "gelir" ? "↙" : "↗"}</div>
+            <div key={t.id} className="gold-card p-4 flex sm:items-center gap-3" data-testid={`tx-row-${t.id}`}>
+              <div className={`hidden sm:flex w-10 h-10 rounded-full items-center justify-center shrink-0 ${t.type === "gelir" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>{t.type === "gelir" ? "↙" : "↗"}</div>
               <div className="flex-1 min-w-0">
                 <p className="font-semibold truncate">{t.description || t.category}</p>
                 <p className="text-xs text-charcoal-light">{fmtDate(t.date)} · {t.category} · {t.site_name || "Genel"}{t.account_name ? ` · ${t.account_name}` : ""} · Kasa: {t.kasa === "cek" ? "Devrantaş Çek" : "Devrantaş Nakit"}</p>
@@ -131,10 +131,10 @@ export default function Transactions() {
                   {t.approved_by_name && t.type === "gider" && <span className="text-[11px] text-charcoal-muted">{t.status === "reddedildi" ? "Reddeden" : "Onaylayan"}: {t.approved_by_name}{t.reject_reason ? ` — ${t.reject_reason}` : ""}</span>}
                   <span className="text-[11px] text-charcoal-muted">Ekleyen: {t.created_by_name}</span></div>
               </div>
-              <div className="flex items-center gap-2 justify-between sm:justify-end">
-                <Money value={t.type === "gider" ? -t.amount : t.amount} signed className="text-lg font-semibold" />
+              <div className="flex flex-col items-end sm:flex-row sm:items-center gap-2 shrink-0">
+                <Money value={t.type === "gider" ? -t.amount : t.amount} signed className="text-base sm:text-lg font-semibold whitespace-nowrap" />
                 {t.status === "onay_bekliyor" && isManager && (
-                  <div className="flex gap-1">
+                  <div className="flex flex-col sm:flex-row gap-1">
                     <button onClick={() => approve.mutate(t.id)} className="h-9 px-3 rounded-full bg-emerald-600 text-white text-xs font-semibold inline-flex items-center gap-1 hover:bg-emerald-700" data-testid={`approve-expense-${t.id}`}><Check className="w-3.5 h-3.5" /> Onayla</button>
                     <button onClick={() => { const r = window.prompt("Red nedeni (isteğe bağlı):") ?? null; if (r !== null) reject.mutate({ id: t.id, reason: r }); }} className="h-9 px-3 rounded-full bg-white border border-red-200 text-red-700 text-xs font-semibold inline-flex items-center gap-1 hover:bg-red-50" data-testid={`reject-expense-${t.id}`}><X className="w-3.5 h-3.5" /> Reddet</button>
                   </div>
