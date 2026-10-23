@@ -37,21 +37,57 @@ async def build_export(inline_files: bool = True) -> dict:
 
 
 async def apply_import(payload: dict) -> dict:
-    if payload.get("version") != 1 or "collections" not in payload:
+    if payload.get("version") != 1 or not isinstance(payload.get("collections"), dict):
         raise HTTPException(status_code=400, detail="Geçersiz yedek dosyası")
-    counts = {}
+    cols = payload["collections"]
+    missing = [c for c in COLLECTIONS if c not in cols]
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Yedek eksik: {', '.join(missing)} bölümü yok. Daha yeni bir yedek alın.")
     for c in COLLECTIONS:
-        docs = payload["collections"].get(c, [])
-        await db[c].delete_many({})
-        if docs:
-            await db[c].insert_many([dict(d) for d in docs])
-        counts[c] = len(docs)
+        if not isinstance(cols[c], list) or any(not isinstance(d, dict) or not d.get("id") for d in cols[c]):
+            raise HTTPException(status_code=400, detail=f"Yedek bozuk: '{c}' kayıtları geçersiz")
+    if not cols["users"] or not any(u.get("role") == "yonetici" for u in cols["users"]):
+        raise HTTPException(status_code=400, detail="Yedekte yönetici kullanıcı yok; içe aktarma iptal edildi")
+    # 1) Otomatik güvenlik yedeği (geri dönüş için)
+    snapshot = await build_export(inline_files=False)
+    snap_id = f"restore-point-{now_iso()}"
+    await db.restore_points.insert_one({"id": snap_id, "created_at": now_iso(), "payload": json.dumps(snapshot, ensure_ascii=False)})
+    old = await db.restore_points.find({}, {"_id": 0, "id": 1}).sort("created_at", -1).skip(5).to_list(100)
+    if old:
+        await db.restore_points.delete_many({"id": {"$in": [o["id"] for o in old]}})
+    # 2) Geçici koleksiyonlara yaz, hepsi başarılıysa yer değiştir
+    staged = []
+    try:
+        for c in COLLECTIONS:
+            tmp = f"__import_{c}"
+            await db[tmp].drop()
+            if cols[c]:
+                await db[tmp].insert_many([dict(d) for d in cols[c]])
+            staged.append((c, tmp))
+    except Exception as e:
+        for _, tmp in staged:
+            await db[tmp].drop()
+        await db[f"__import_{COLLECTIONS[len(staged)]}"].drop()
+        raise HTTPException(status_code=400, detail=f"İçe aktarma başarısız, mevcut veriler korundu: {e}")
+    counts = {}
+    for c, tmp in staged:
+        await db[c].drop()
+        if cols[c]:
+            await db[tmp].rename(c, dropTarget=True)
+        else:
+            await db[tmp].drop()
+        counts[c] = len(cols[c])
+    await db.users.create_index("email", unique=True)
+    await db.transactions.create_index([("site_id", 1), ("status", 1)])
+    await db.reminders.create_index([("remind_date", 1), ("dismissed", 1)])
+    await db.alert_logs.create_index("run_id", unique=True)
     for s in payload.get("settings", []):
-        await db.settings.replace_one({"id": s["id"]}, s, upsert=True)
+        if s.get("id") in SETTINGS_IDS:
+            await db.settings.replace_one({"id": s["id"]}, s, upsert=True)
     settings_cache.update({"settings": None, "logo_path": None, "logo_file_id": None})
     blobs = payload.get("blobs", {})
     restored = 0
-    types = {f["storage_path"]: f.get("content_type", "application/octet-stream") for f in payload["collections"].get("files", [])}
+    types = {f["storage_path"]: f.get("content_type", "application/octet-stream") for f in cols["files"] if f.get("storage_path")}
     for path, b64 in blobs.items():
         try:
             get_object(path)
@@ -64,6 +100,7 @@ async def apply_import(payload: dict) -> dict:
         except Exception as e:
             logger.error(f"Blob restore failed {path}: {e}")
     counts["files_restored"] = restored
+    counts["restore_point"] = snap_id
     return counts
 
 
@@ -121,4 +158,14 @@ async def pull_from_source(data: PullIn, user=Depends(require_role("yonetici")))
 async def stats(user=Depends(require_role("yonetici"))):
     out = {c: await db[c].count_documents({}) for c in COLLECTIONS if c not in ("ai_messages", "ai_sessions", "alert_logs", "reminders")}
     out["test_records"] = await db.sites.count_documents({"name": {"$regex": "^TEST_"}}) + await db.accounts.count_documents({"name": {"$regex": "^TEST_"}})
+    out["restore_points"] = await db.restore_points.find({}, {"_id": 0, "id": 1, "created_at": 1}).sort("created_at", -1).to_list(5)
     return out
+
+
+@router.post("/restore-points/{rid}/restore")
+async def restore_point(rid: str, user=Depends(require_role("yonetici"))):
+    rp = await db.restore_points.find_one({"id": rid}, {"_id": 0})
+    if not rp:
+        raise HTTPException(status_code=404, detail="Geri dönüş noktası bulunamadı")
+    counts = await apply_import(json.loads(rp["payload"]))
+    return {"ok": True, "counts": counts}

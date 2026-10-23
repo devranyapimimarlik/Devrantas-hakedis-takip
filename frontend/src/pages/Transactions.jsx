@@ -25,16 +25,19 @@ export function TransactionForm({ defaults = {}, onDone }) {
   const isSub = f.category.startsWith("Taşeron");
   const isIncome = f.type === "gelir";
   const accType = isIncome ? "musteri" : isSub ? "taseron" : null;
+  const withKeys = (list) => list.map((b) => ({ ...b, client_key: b.client_key || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}` }));
   const saveOffline = async (list) => {
     for (const b of list) await enqueue({ kind: "transaction", payload: b, file: localFile || null, fileName: localFile?.name });
     toast.info(`Çevrimdışı kaydedildi (${list.length}) — bağlantı gelince otomatik gönderilecek`);
     onDone?.();
   };
   const m = useMutation({
-    mutationFn: async (list) => {
+    mutationFn: async (raw) => {
+      const list = withKeys(raw);
       if (isOffline() || localFile) { await saveOffline(list); return null; }
-      try { for (const b of list) await api.post("/transactions", b); return list; }
-      catch (e) { if (isNetworkError(e)) { await saveOffline(list); return null; } throw e; }
+      const pending = [...list];
+      try { while (pending.length) { await api.post("/transactions", pending[0]); pending.shift(); } return list; }
+      catch (e) { if (isNetworkError(e)) { await saveOffline(pending); return null; } throw e; }
     },
     onSuccess: (list) => { if (!list) return; ["transactions", "dashboard", "sites", "pending-count", "accounts", "site", "kasa", "reports", "reminders"].forEach((k) => qc.invalidateQueries({ queryKey: [k] })); toast.success(list[0].type === "gider" ? "Ödeme kaydedildi — yönetici onayı bekliyor" : "Tahsilat kaydedildi"); onDone?.(); },
     onError: (e) => toast.error(errMsg(e)),

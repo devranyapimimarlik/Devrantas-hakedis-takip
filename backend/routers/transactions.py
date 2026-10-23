@@ -28,6 +28,7 @@ class TransactionIn(BaseModel):
     kasa: str  # nakit | cek
     attachment_file_id: Optional[str] = None
     check_due_date: Optional[str] = None
+    client_key: Optional[str] = None
     check_bank: Optional[str] = ""
     check_no: Optional[str] = ""
 
@@ -91,6 +92,11 @@ async def create_transaction(data: TransactionIn, background: BackgroundTasks, u
         raise HTTPException(status_code=400, detail="Kasa seçimi zorunlu (nakit veya çek)")
     if data.category in SUB_CATEGORIES and not data.account_id:
         raise HTTPException(status_code=400, detail="Taşeron ödemesi için taşeron seçilmeli")
+    if data.client_key:
+        existing = await db.transactions.find_one({"client_key": data.client_key, "created_by": user["id"]}, {"_id": 0})
+        if existing:
+            sites, accounts = await _lookups()
+            return await _enrich(existing, sites, accounts)
     status = "onaylandi" if data.type == "gelir" else "onay_bekliyor"
     doc = {"id": new_id(), **data.model_dump(), "status": status, "created_by": user["id"],
            "created_by_name": user["name"], "created_at": now_iso(), "approved_by": None, "approved_at": None,

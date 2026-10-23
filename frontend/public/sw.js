@@ -1,4 +1,4 @@
-const CACHE = "devrantas-v2";
+const CACHE = "devrantas-v3";
 const SHELL = ["/", "/api/settings/manifest.json", "/api/settings/logo"];
 
 self.addEventListener("install", (e) => {
@@ -14,7 +14,9 @@ self.addEventListener("fetch", (e) => {
   if (req.method !== "GET") return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
-  if (url.pathname.startsWith("/api/files/")) return;
+  const isApi = url.pathname.startsWith("/api/");
+  const publicApi = url.pathname.startsWith("/api/settings/logo") || url.pathname.startsWith("/api/settings/manifest");
+  if (isApi && !publicApi) return;
   if (req.mode === "navigate") {
     e.respondWith(fetch(req).then((res) => { caches.open(CACHE).then((c) => c.put("/", res.clone())); return res; }).catch(() => caches.match("/")));
     return;
@@ -25,6 +27,10 @@ self.addEventListener("fetch", (e) => {
       return res;
     }).catch(() => caches.match(req))
   );
+});
+
+self.addEventListener("message", (e) => {
+  if (e.data?.type === "clear-cache") e.waitUntil(caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k)))));
 });
 
 self.addEventListener("push", (e) => {

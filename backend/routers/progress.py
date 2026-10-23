@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional, List
 from core import db, get_current_user, require_role, new_id, now_iso, r2, OVERHEAD_RATE
@@ -137,7 +137,7 @@ async def progress_payments_list(pid: str, user=Depends(get_current_user)):
 
 
 @router.post("/{pid}/pay", status_code=201)
-async def pay_progress(pid: str, data: PayIn, user=Depends(get_current_user)):
+async def pay_progress(pid: str, data: PayIn, background: BackgroundTasks, user=Depends(get_current_user)):
     from routers.transactions import TransactionIn, create_transaction
     h = await db.progress_payments.find_one({"id": pid}, {"_id": 0})
     if not h:
@@ -158,7 +158,7 @@ async def pay_progress(pid: str, data: PayIn, user=Depends(get_current_user)):
         tx = TransactionIn(site_id=h["site_id"], account_id=h["account_id"], type=ttype, category=cat, amount=amount, date=data.date,
                            description=desc, kasa=kasa, attachment_file_id=data.attachment_file_id,
                            check_due_date=data.check_due_date if kasa == "cek" else None, check_bank=data.check_bank, check_no=data.check_no)
-        doc = await create_transaction(tx, user)
+        doc = await create_transaction(tx, background, user)
         await db.transactions.update_one({"id": doc["id"]}, {"$set": {"progress_payment_id": pid}})
         doc["progress_payment_id"] = pid
         created.append(doc)

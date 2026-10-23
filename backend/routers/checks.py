@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional
 from datetime import date, timedelta
@@ -109,7 +109,7 @@ class EndorseIn(BaseModel):
 
 
 @router.post("/checks/{cid}/endorse", status_code=201)
-async def endorse_check(cid: str, data: EndorseIn, user=Depends(get_current_user)):
+async def endorse_check(cid: str, data: EndorseIn, background: BackgroundTasks, user=Depends(get_current_user)):
     from routers.transactions import TransactionIn, create_transaction
     c = await db.checks.find_one({"id": cid}, {"_id": 0})
     if not c:
@@ -128,7 +128,7 @@ async def endorse_check(cid: str, data: EndorseIn, user=Depends(get_current_user
     tx = TransactionIn(site_id=(h or {}).get("site_id") or c.get("site_id"), account_id=data.account_id, type="gider",
                        category="Taşeron Hakediş Ödemesi" if h else "Taşeron Avansı", amount=c["amount"], date=data.date or today_str(),
                        description=desc.strip(), kasa="cek", attachment_file_id=c.get("image_file_id"))
-    doc = await create_transaction(tx, user)
+    doc = await create_transaction(tx, background, user)
     upd = {"check_id": cid, "endorsed": True}
     if h:
         upd["progress_payment_id"] = h["id"]

@@ -20,6 +20,7 @@ export function AuthProvider({ children }) {
 
   const logout = useCallback(async () => {
     try { await api.post("/auth/logout"); } catch { /* ignore */ }
+    navigator.serviceWorker?.controller?.postMessage({ type: "clear-cache" });
     setToken(null);
     setUser(false);
   }, []);
