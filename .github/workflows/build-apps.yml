@@ -2,12 +2,16 @@ name: Uygulama Derlemeleri (Windows · Android · iOS TestFlight)
 
 on:
   workflow_dispatch:
-  push :       
-  branches: [main, master, conflict_241026_2355]
+  push:
+    branches: [main, master, conflict_241026_2355]
     paths:
       - "desktop/**"
       - "mobile/**"
       - ".github/workflows/build-apps.yml"
+
+
+
+
 
 permissions:
   contents: write
