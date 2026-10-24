@@ -8,13 +8,14 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 @router.get("")
 async def dashboard(user=Depends(get_current_user)):
     sites = await db.sites.find({}, {"_id": 0}).to_list(200)
-    site_rows, agg = [], {"contract": 0, "overhead": 0, "income": 0, "expense": 0, "pending": 0, "profit": 0}
+    site_rows, agg = [], {"contract": 0, "overhead": 0, "income": 0, "expense": 0, "pending": 0, "profit": 0, "realized_profit": 0, "realized_overhead": 0}
     for s in sites:
         sm = await site_summary(s)
         site_rows.append({"id": s["id"], "name": s["name"], "status": s.get("status"), **sm})
         agg["contract"] += sm["contract_amount"]; agg["overhead"] += sm["overhead_amount"]
         agg["income"] += sm["total_income"]; agg["expense"] += sm["total_expense"]
         agg["pending"] += sm["pending_expense"]; agg["profit"] += sm["estimated_profit"]
+        agg["realized_profit"] += sm["realized_profit"]; agg["realized_overhead"] += sm["realized_overhead"]
     pending_count = await db.transactions.count_documents({"status": "onay_bekliyor"})
     monthly = {}
     async for t in db.transactions.find({"status": "onaylandi"}, {"_id": 0, "date": 1, "type": 1, "amount": 1}):

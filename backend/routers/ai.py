@@ -54,9 +54,9 @@ async def financial_context() -> str:
     lines = ["GENEL FİNANSAL DURUM:"]
     for s in sites:
         sm = await site_summary(s)
-        lines.append(f"- Şantiye '{s['name']}' ({s.get('status')}): Sözleşme {fmt(sm['contract_amount'])}, %6 Genel Gider {fmt(sm['overhead_amount'])}, "
-                     f"Tahsilat {fmt(sm['total_income'])}, Onaylı Gider {fmt(sm['total_expense'])}, Bekleyen Gider {fmt(sm['pending_expense'])}, "
-                     f"Tahmini Kâr {fmt(sm['estimated_profit'])} (%{sm['profit_margin']}), İlerleme %{sm['progress_percent']}, Bütçe Kullanımı %{sm['budget_used_percent']}")
+        lines.append(f"- Şantiye '{s['name']}' ({s.get('status')}): Sözleşme {fmt(sm['contract_amount'])}, Tahsilat {fmt(sm['total_income'])}, %6 Genel Gider (tahsilat üzerinden) {fmt(sm['realized_overhead'])}, "
+                     f"Onaylı Gider {fmt(sm['total_expense'])}, Bekleyen Gider {fmt(sm['pending_expense'])}, Gerçekleşen Kâr {fmt(sm['realized_profit'])}, "
+                     f"Tahmini Kâr (sözleşme bazlı) {fmt(sm['estimated_profit'])} (%{sm['profit_margin']}), İlerleme %{sm['progress_percent']}, Bütçe Kullanımı %{sm['budget_used_percent']}")
     accounts = await db.accounts.find({}, {"_id": 0}).to_list(500)
     for a in accounts:
         b = await account_balance(a)

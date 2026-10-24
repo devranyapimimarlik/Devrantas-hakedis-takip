@@ -208,7 +208,8 @@ async def site_summary(site: dict) -> dict:
     net_contract = contract - overhead
     expense = direct_expense + sub_expense
     est_profit = net_contract - expense
-    realized_profit = income - income * OVERHEAD_RATE - expense
+    realized_overhead = income * OVERHEAD_RATE
+    realized_profit = income - realized_overhead - expense
     progress = float(site.get("progress_percent") or 0)
     budget_used = (expense / net_contract * 100) if net_contract else 0
     return {
@@ -217,7 +218,8 @@ async def site_summary(site: dict) -> dict:
         "direct_expense": r2(direct_expense), "subcontractor_expense": r2(sub_expense), "subcontractor_paid": r2(sub_paid),
         "pending_expense": r2(pending_total), "estimated_profit": r2(est_profit),
         "profit_margin": r2(est_profit / contract * 100) if contract else 0,
-        "realized_profit": r2(realized_profit), "collection_rate": r2(income / contract * 100) if contract else 0,
+        "realized_profit": r2(realized_profit), "realized_overhead": r2(realized_overhead),
+        "collection_rate": r2(income / contract * 100) if contract else 0,
         "budget_used_percent": r2(budget_used), "progress_percent": progress,
         "deviation": r2(budget_used - progress),
     }

@@ -1,0 +1,35 @@
+{
+  "summary": "Retest of iteration_5 follow-ups. Backend: 10 new tests plus 12 iteration_5 regression tests, 22/22 PASS. Verified: delete_transactions (deleting your own pending record 200; others' pending and own approved 403; after granting the perm, deleting an approved record 200); edit_checks (PUT 200 with defaults; with the perm revoked PUT/PATCH status/endorse/DELETE all 403 and the check stays unchanged); view_reports (santiye_sefi 403 on /reports and /reports/export, muhasebe 200); PATCH progress status needs edit_progress (200, then 403 when revoked); close_if_paid revert (odendi -> onaylandi when net goes from 1000 to 2000); muhasebe editing an approved hakediş net -> taslak with reapproval_note, same-net edit keeps onaylandi, admin edit keeps onaylandi; tx kasa nakit->cek 400 'değiştirilemez', same kasa accepted. Frontend: admin sees nav-reports; TEST_ santiye_sefi has no Raporlar/Kasa nav on desktop or mobile; mobile 390 permissions-mobile stacked blocks visible with perm-m-* checkboxes, desktop table hidden, no horizontal overflow (scrollWidth 390); user rows readable with the role select on its own line; desktop 1920 shows the perm-{role}-{key} table and hides the mobile block; progress-edit-button visible to admin on an odendi hakediş; AccountDetail labels follow the account's type even when the URL type does not match. All TEST_ data cleaned up and permissions restored to defaults.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "DELETE /api/checks/{id}", "issue": "Deleting a check that is linked to a transaction (transaction.check_id) leaves the transaction pointing at a check that no longer exists. Ciro'd checks are not blocked either."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Reports page (/raporlar)", "issue": "A user without view_reports can open /raporlar directly. The page shell (filters, tabs) renders with an empty body, and /api/reports returns 403 with no 'yetkiniz yok' message and no redirect.", "selector": "route /raporlar", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Raporlar filters (mobile)", "issues": ["Start/end use native <input type=date> showing mm/dd/yyyy in a Turkish app; consider the shadcn Calendar or a tr locale format"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iteration6_perm_enforcement.py", "/app/backend/tests/test_iteration5_permissions_edit.py", "/app/backend/tests/ui_seed_iter6.py", "/app/test_reports/pytest/pytest_iter6.xml"],
+  "action_items": [
+    "Optional: add a route guard or 'Yetkiniz yok' empty state on /raporlar when the user lacks view_reports",
+    "Optional: on DELETE /checks/{id}, block the delete or clear check_id on the linked transaction (and handle ciro_edildi checks)",
+    "Housekeeping: 3 leftover 'Test Muhasebe' users (muhasebe_18900a88@, muhasebe_6272a5de@, muhasebe_986c3b82@example.com, created 2026-10-21 by earlier runs) are still in the real users list; delete via DELETE /api/auth/users/{id}"
+  ],
+  "critical_code_review_comments": [
+    "core._perm_cache is per process. Fine with --workers 1, but with multiple workers or replicas a permission change will not invalidate the other caches; add a TTL or re-read on version.",
+    "set_status lets anyone with edit_progress set any status, including manually marking 'odendi' with no payments and approving their own hakediş. Consider restricting approval (taslak->onaylandi) to approve_expenses or the yönetici, since non-admin edits already force re-approval.",
+    "delete_tx own_pending covers 'reddedildi' as well (status != onaylandi). That is probably intended; just confirming."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration6_perm_enforcement.py", "/app/backend/tests/ui_seed_iter6.py"],
+  "success_rate": {"backend": "100%", "frontend": "100% of requested checks"},
+  "seed_data_creation": "Temporary TEST_ site/accounts/hakediş/tx and the santiye_sefi user test_ui_sef6@example.com, all deleted afterwards. Permissions restored to defaults (verified in DB).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: REACT_APP_BACKEND_URL=... pytest tests/test_iteration6_perm_enforcement.py tests/test_iteration5_permissions_edit.py -n 0. UI seed: python tests/ui_seed_iter6.py seed|cleanup (creates an odendi hakediş and a santiye_sefi user; cleanup restores perms). The server date is 2026-10-24. Login via API and set localStorage dvt_token."
+}

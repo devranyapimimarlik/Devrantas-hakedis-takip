@@ -20,10 +20,10 @@ export default function Dashboard() {
       <ReminderBanners compact />
       <DailySummaryCard compact />
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
-        <StatCard label="Toplam Sözleşme" value={fmtTL(t.contract)} hint={`%6 Genel Gider: ${fmtTL(t.overhead)}`} icon={Wallet} testId="stat-contract" />
-        <StatCard label="Toplam Tahsilat" value={fmtTL(t.income)} tone="green" icon={TrendingUp} testId="stat-income" delay={60} />
+        <StatCard label="Toplam Sözleşme" value={fmtTL(t.contract)} hint={`Tahmini %6 genel gider: ${fmtTL(t.overhead)}`} icon={Wallet} testId="stat-contract" />
+        <StatCard label="Toplam Tahsilat" value={fmtTL(t.income)} hint={`%6 genel gider (tahsilat üzerinden): ${fmtTL(t.realized_overhead)}`} tone="green" icon={TrendingUp} testId="stat-income" delay={60} />
         <StatCard label="Onaylı Gider" value={fmtTL(t.expense)} hint={`Onay bekleyen: ${fmtTL(t.pending)}`} tone="red" icon={TrendingDown} testId="stat-expense" delay={120} />
-        <StatCard label="Tahmini Kâr" value={fmtTL(t.profit)} hint={`Kâr marjı %${data.profit_margin}`} tone={t.profit >= 0 ? "green" : "red"} icon={Percent} testId="stat-profit" delay={180} />
+        <StatCard label="Gerçekleşen Kâr" value={fmtTL(t.realized_profit)} hint={`Tahsilat − %6 − gider · Tahmini (sözleşme): ${fmtTL(t.profit)}`} tone={t.realized_profit >= 0 ? "green" : "red"} icon={Percent} testId="stat-profit" delay={180} />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <div className="gold-card p-5 flex items-center gap-4" data-testid="kasa-nakit-card"><Wallet className="w-8 h-8 text-gold" /><div><p className="label-gold">Devrantaş Nakit Kasa</p><p className={`money text-xl font-semibold ${data.kasa.nakit < 0 ? "text-red-700" : "text-charcoal"}`}>{fmtTL(data.kasa.nakit)}</p></div></div>

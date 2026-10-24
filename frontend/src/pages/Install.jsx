@@ -2,6 +2,7 @@ import { PageHeader } from "@/components/shared/Bits";
 import { InstallGuide } from "@/components/shared/PwaInstall";
 import { PushToggle } from "@/components/shared/PushToggle";
 import { ApnsKeyCard } from "@/components/shared/ApnsKeyCard";
+import { MigrationGuide, LIVE_URL } from "@/components/shared/MigrationGuide";
 import { QRCodeSVG } from "qrcode.react";
 import { useSettings } from "@/context/SettingsContext";
 import { ShieldCheck, WifiOff, Bell, Palette } from "lucide-react";
@@ -21,9 +22,10 @@ export default function Install() {
       <div className="gold-card p-6 mb-6 flex flex-col sm:flex-row items-center gap-5">
         <img src={logoUrl} alt="" className="w-20 h-20 rounded-[22%] object-contain bg-white shadow-lg" data-testid="install-icon-preview" />
         <div className="flex-1"><p className="font-serif text-2xl font-bold">{settings?.short_name || "Devrantaş"}</p><p className="text-sm text-charcoal-light">Ana ekranda bu simge ve bu isimle görünür. Görünüm sayfasından logo/renk değiştirince simge de güncellenir.</p>
-          <p className="text-xs text-charcoal-light mt-2 break-all" data-testid="install-url">Uygulama adresi: <b>{window.location.origin}</b></p></div>
-        <div className="bg-white p-3 rounded-2xl shadow-sm" data-testid="install-qr"><QRCodeSVG value={window.location.origin + "/telefona-kur"} size={120} fgColor="#1F1B16" /><p className="text-[10px] text-center text-charcoal-light mt-1">Telefonla okutun</p></div>
+          <p className="text-xs text-charcoal-light mt-2 break-all" data-testid="install-url">Kalıcı uygulama adresi: <b>{LIVE_URL}</b></p></div>
+        <div className="bg-white p-3 rounded-2xl shadow-sm" data-testid="install-qr"><QRCodeSVG value={LIVE_URL + "/telefona-kur"} size={120} fgColor="#1F1B16" /><p className="text-[10px] text-center text-charcoal-light mt-1">Telefonla okutun</p></div>
       </div>
+      <div className="mb-6"><MigrationGuide /></div>
       <InstallGuide />
       <div className="mt-6 space-y-4"><PushToggle /><ApnsKeyCard /></div>
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">

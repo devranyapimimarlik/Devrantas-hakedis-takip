@@ -36,10 +36,10 @@ export default function SiteDetail() {
         <StatCard label="Sözleşme Bedeli" value={fmtTL(sm.contract_amount)} hint={`Net (−%6): ${fmtTL(sm.net_contract)}`} testId="site-stat-contract" />
         <StatCard label="Tahsilat" value={fmtTL(sm.total_income)} hint={`Tahsilat oranı %${sm.collection_rate}`} tone="green" testId="site-stat-income" delay={60} />
         <StatCard label="Onaylı Gider" value={fmtTL(sm.total_expense)} hint={`Onay bekleyen: ${fmtTL(sm.pending_expense)}`} tone="red" testId="site-stat-expense" delay={120} />
-        <StatCard label="Tahmini Kâr" value={fmtTL(sm.estimated_profit)} hint={`Kâr marjı %${sm.profit_margin} · Gerçekleşen ${fmtTL(sm.realized_profit)}`} tone={sm.estimated_profit >= 0 ? "green" : "red"} testId="site-stat-profit" delay={180} />
+        <StatCard label="Gerçekleşen Kâr" value={fmtTL(sm.realized_profit)} hint={`Tahsilat − %6 (${fmtTL(sm.realized_overhead)}) − gider · Tahmini: ${fmtTL(sm.estimated_profit)} (marj %${sm.profit_margin})`} tone={sm.realized_profit >= 0 ? "green" : "red"} testId="site-stat-profit" delay={180} />
       </div>
       <div className="gold-card p-5 mb-6">
-        <div className="flex flex-wrap items-center gap-3 mb-3"><OverheadTag amount={sm.overhead_amount} /><span className="text-xs text-charcoal-muted">Sözleşme bedelinden otomatik düşülür.</span></div>
+        <div className="flex flex-wrap items-center gap-3 mb-3"><OverheadTag amount={sm.overhead_amount} /><span className="text-xs text-charcoal-muted">Sözleşme bazlı tahmin · Kârda tahsil edilen gelir üzerinden %6 düşülür.</span></div>
         <div className="grid sm:grid-cols-2 gap-4 text-xs font-mono">
           <div><div className="flex justify-between mb-1"><span>Fiziksel İlerleme</span><span>%{sm.progress_percent}</span></div><div className="h-2 rounded-full bg-stone-100"><div className="h-full rounded-full bg-gold" style={{ width: `${Math.min(100, sm.progress_percent)}%` }} /></div></div>
           <div><div className="flex justify-between mb-1"><span>Bütçe Kullanımı</span><span>%{sm.budget_used_percent}</span></div><div className="h-2 rounded-full bg-stone-100"><div className={`h-full rounded-full ${warn ? "bg-red-600" : "bg-charcoal"}`} style={{ width: `${Math.min(100, sm.budget_used_percent)}%` }} /></div></div>

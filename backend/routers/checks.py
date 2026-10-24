@@ -96,6 +96,14 @@ async def check_status(cid: str, data: CheckStatusIn, user=Depends(require_perm(
 
 @router.delete("/checks/{cid}")
 async def delete_check(cid: str, user=Depends(require_perm("edit_checks"))):
+    c = await db.checks.find_one({"id": cid}, {"_id": 0, "status": 1})
+    if not c:
+        raise HTTPException(status_code=404, detail="Çek bulunamadı")
+    if c.get("status") == "ciro_edildi":
+        raise HTTPException(status_code=400, detail="Ciro edilmiş çek silinemez; önce ciro işlemini (gider kaydını) silin")
+    linked = await db.transactions.count_documents({"check_id": cid})
+    if linked:
+        raise HTTPException(status_code=400, detail="Bu çek bir gelir/gider kaydına bağlı; çeki silmek için önce o kaydı silin")
     await db.checks.delete_one({"id": cid})
     await db.reminders.delete_many({"source_id": cid})
     return {"ok": True}

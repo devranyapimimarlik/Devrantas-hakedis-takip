@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { api, errMsg, openPdf, downloadFile } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import { fmtTL, fmtDate, STATUS_LABELS } from "@/lib/format";
 import { PageHeader, EmptyState, Field, Money, StatusBadge } from "@/components/shared/Bits";
 import { NInput, NSelect, GoldButton, Chip } from "@/components/shared/Inputs";
@@ -37,12 +38,13 @@ function Movements({ rows }) {
 }
 
 export default function Reports() {
+  const { can } = useAuth();
   const [sp, setSp] = useSearchParams();
   const tab = sp.get("tab") || "kar_zarar";
   const [filt, setFilt] = useState({ start: "", end: "", site_id: "", account_id: "" });
   const { data: sites = [] } = useQuery({ queryKey: ["sites"], queryFn: () => api.get("/sites").then((r) => r.data) });
   const { data: subs = [] } = useQuery({ queryKey: ["accounts", "taseron"], queryFn: () => api.get("/accounts", { params: { type: "taseron" } }).then((r) => r.data) });
-  const { data, isLoading } = useQuery({ queryKey: ["reports", filt], queryFn: () => api.get("/reports", { params: Object.fromEntries(Object.entries(filt).filter(([, v]) => v)) }).then((r) => r.data) });
+  const { data, isLoading } = useQuery({ queryKey: ["reports", filt], enabled: can("view_reports"), queryFn: () => api.get("/reports", { params: Object.fromEntries(Object.entries(filt).filter(([, v]) => v)) }).then((r) => r.data) });
   const ai = useMutation({ mutationFn: () => api.post("/ai/financial-analysis"), onError: (e) => toast.error(errMsg(e)) });
   const set = (k) => (e) => setFilt({ ...filt, [k]: e.target.value });
   const exportReport = async (format) => {
@@ -51,6 +53,7 @@ export default function Reports() {
     catch (e) { toast.error(errMsg(e)); }
   };
 
+  if (!can("view_reports")) return <div data-testid="reports-denied"><PageHeader title="Raporlar" /><EmptyState title="Bu bölüm için yetkiniz yok" desc="Raporları görmek için yöneticinizden 'Raporları görme' yetkisi isteyin." testId="reports-denied-empty" /></div>;
   return (
     <div data-testid="reports-page">
       <PageHeader title="Raporlar" actions={<>
@@ -75,18 +78,23 @@ export default function Reports() {
             <Card title="Hesap hareketleri (tarih · tür · tutar · belge)"><Movements rows={data.kasa.movements} /></Card>
           </>}
           {tab === "kar_zarar" && <>
-            <Card title="Genel Kâr / Zarar" testId="report-pl">
-              <Row label="Toplam gelir" value={data.kar_zarar.gelir} />
+            <Card title="Genel Kâr / Zarar (Gerçekleşen)" testId="report-pl">
+              <Row label="Toplam gelir" sub="Onaylı tahsilatlar" value={data.kar_zarar.gelir} />
               <Row label="Toplam gider" sub="Onaylı giderler + onaylı taşeron hakedişleri" value={-data.kar_zarar.gider} />
-              <Row label="Genel gider (%6)" value={-data.kar_zarar.genel_gider} />
+              <Row label="Genel gider (%6)" sub="Tahsil edilen gelir üzerinden hesaplanır" value={-data.kar_zarar.genel_gider} />
               <Row label="Net kâr" value={data.kar_zarar.net} bold neg={data.kar_zarar.net < 0} />
+              <div className="mt-3 pt-3 border-t border-dashed border-stone-200" data-testid="report-pl-projection">
+                <Row label="Sözleşme toplamı" value={data.kar_zarar.sozlesme} />
+                <Row label="Tahmini kâr (sözleşme bazlı)" sub={`Sözleşme − %6 genel gider (${fmtTL(data.kar_zarar.tahmini_genel_gider)}) − giderler`} value={data.kar_zarar.tahmini_kar} neg={data.kar_zarar.tahmini_kar < 0} />
+              </div>
             </Card>
             {data.kar_zarar.sites.map((s) => (
               <Card key={s.id} title={s.name} testId={`report-pl-site-${s.id}`}>
-                <Row label="Sözleşme" value={s.contract_amount} /><Row label="Tahsilat" value={s.total_income} />
+                <Row label="Sözleşme" value={s.contract_amount} /><Row label="Tahsilat" sub={`Tahsilat oranı %${s.collection_rate}`} value={s.total_income} />
                 <Row label="Gider" sub={`Doğrudan ${fmtTL(s.direct_expense)} + Taşeron hakediş ${fmtTL(s.subcontractor_expense)}`} value={-s.total_expense} />
-                <Row label="Genel gider (%6)" value={-s.overhead_amount} />
-                <Row label="Kâr" sub={`Marj %${s.profit_margin} · İlerleme %${s.progress_percent}`} value={s.estimated_profit} bold neg={s.estimated_profit < 0} />
+                <Row label="Genel gider (%6)" sub="Tahsilat üzerinden" value={-s.realized_overhead} />
+                <Row label="Gerçekleşen kâr" sub={`İlerleme %${s.progress_percent}`} value={s.realized_profit} bold neg={s.realized_profit < 0} />
+                <Row label="Tahmini kâr (sözleşme bazlı)" sub={`Marj %${s.profit_margin}`} value={s.estimated_profit} neg={s.estimated_profit < 0} />
               </Card>))}
           </>}
           {tab === "musteri_risk" && <Card title="Müşteri Risk Analizi" testId="report-risk">
