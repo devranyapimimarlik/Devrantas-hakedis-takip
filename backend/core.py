@@ -102,6 +102,52 @@ def require_role(*roles):
     return checker
 
 
+# ---------- Yetki matrisi (yönetici belirler) ----------
+PERMISSIONS = {
+    "edit_transactions": "Gelir/gider kaydını düzenleme",
+    "delete_transactions": "Gelir/gider kaydını silme",
+    "approve_expenses": "Gider onaylama / reddetme",
+    "edit_progress": "Hakediş düzenleme",
+    "edit_sites": "Şantiye düzenleme",
+    "edit_accounts": "Cari (müşteri/taşeron) düzenleme",
+    "edit_checks": "Çek düzenleme / ciro",
+    "view_reports": "Raporları görme",
+}
+DEFAULT_PERMISSIONS = {
+    "muhasebe": {"edit_transactions": True, "delete_transactions": False, "approve_expenses": False, "edit_progress": True, "edit_sites": False, "edit_accounts": True, "edit_checks": True, "view_reports": True},
+    "santiye_sefi": {"edit_transactions": True, "delete_transactions": False, "approve_expenses": False, "edit_progress": True, "edit_sites": True, "edit_accounts": False, "edit_checks": False, "view_reports": False},
+}
+_perm_cache = {"doc": None}
+
+
+async def get_permissions() -> dict:
+    if _perm_cache["doc"] is None:
+        doc = await db.settings.find_one({"id": "permissions"}, {"_id": 0}) or {}
+        merged = {r: {**DEFAULT_PERMISSIONS[r], **(doc.get(r) or {})} for r in DEFAULT_PERMISSIONS}
+        _perm_cache["doc"] = merged
+    return _perm_cache["doc"]
+
+
+def invalidate_permissions():
+    _perm_cache["doc"] = None
+
+
+async def user_permissions(user: dict) -> dict:
+    if user.get("role") == "yonetici":
+        return {k: True for k in PERMISSIONS}
+    perms = await get_permissions()
+    return perms.get(user.get("role"), {k: False for k in PERMISSIONS})
+
+
+def require_perm(key: str):
+    async def checker(user: dict = Depends(get_current_user)):
+        perms = await user_permissions(user)
+        if not perms.get(key):
+            raise HTTPException(status_code=403, detail=f"Bu işlem için yetkiniz yok ({PERMISSIONS.get(key, key)}). Yönetici yetki verebilir.")
+        return user
+    return checker
+
+
 # ---------- Object Storage ----------
 STORAGE_BASE = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() or "https://integrations.emergentagent.com"
 STORAGE_URL = STORAGE_BASE.rstrip("/") + "/objstore/api/v1/storage"
@@ -185,5 +231,13 @@ async def account_balance(account: dict) -> dict:
     advance = await _sum("transactions", {"account_id": aid, "status": "onaylandi", "type": ttype, "category": {"$in": ["Taşeron Avansı", "Avans"]}})
     nakit = await _sum("transactions", {"account_id": aid, "status": "onaylandi", "type": ttype, "kasa": "nakit"})
     cek = await _sum("transactions", {"account_id": aid, "status": "onaylandi", "type": ttype, "kasa": "cek"})
-    return {"total_progress": r2(hak_total), "total_paid": r2(pay_total), "advance_total": r2(advance),
-            "paid_nakit": r2(nakit), "paid_cek": r2(cek), "balance": r2(hak_total - pay_total)}
+    diff = r2(hak_total - pay_total)
+    is_customer = account.get("type") == "musteri"
+    return {"total_progress": r2(hak_total), "total_paid": r2(pay_total), "advance_total": r2(pay_total if not is_customer else advance),
+            "paid_nakit": r2(nakit), "paid_cek": r2(cek), "balance": diff,
+            # Taşeron: hakediş alacak, tüm ödemeler avans/borç → diff>0 taşerona borcumuz, diff<0 taşeron avans borçlusu
+            # Müşteri: hakediş borç, tahsilat alacak → diff>0 müşteriden alacağımız, diff<0 müşteri alacaklı (fazla tahsilat)
+            "we_owe": r2(max(diff, 0)) if not is_customer else 0.0,
+            "advance_outstanding": r2(max(-diff, 0)) if not is_customer else 0.0,
+            "receivable": r2(max(diff, 0)) if is_customer else 0.0,
+            "customer_credit": r2(max(-diff, 0)) if is_customer else 0.0}

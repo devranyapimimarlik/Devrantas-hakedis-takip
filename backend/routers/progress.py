@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional, List
-from core import db, get_current_user, require_role, new_id, now_iso, r2, OVERHEAD_RATE
+from core import db, get_current_user, require_role, new_id, now_iso, r2, OVERHEAD_RATE, require_perm
 
 router = APIRouter(prefix="/progress-payments", tags=["progress"])
 
@@ -84,13 +84,15 @@ async def get_progress(pid: str, user=Depends(get_current_user)):
 
 
 @router.put("/{pid}")
-async def update_progress(pid: str, data: ProgressIn, user=Depends(get_current_user)):
+async def update_progress(pid: str, data: ProgressIn, user=Depends(require_perm("edit_progress"))):
     h = await db.progress_payments.find_one({"id": pid}, {"_id": 0})
     if not h:
         raise HTTPException(status_code=404, detail="Hakediş bulunamadı")
-    if h["status"] != "taslak":
-        raise HTTPException(status_code=400, detail="Sadece taslak hakedişler düzenlenebilir")
-    await db.progress_payments.update_one({"id": pid}, {"$set": {**data.model_dump(exclude={"items"}), **calc(data)}})
+    if h["status"] == "odendi" and user["role"] != "yonetici":
+        raise HTTPException(status_code=400, detail="Ödenmiş hakedişi yalnızca yönetici düzenleyebilir")
+    await db.progress_payments.update_one({"id": pid}, {"$set": {**data.model_dump(exclude={"items"}), **calc(data), "edited_by": user["id"], "edited_by_name": user["name"], "edited_at": now_iso()}})
+    if h["status"] == "odendi":
+        await close_if_paid(pid)
     return await get_progress(pid, user)
 
 

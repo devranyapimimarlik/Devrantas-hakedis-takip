@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, errMsg } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import { fmtTL, fmtDate } from "@/lib/format";
 import { PageHeader, StatCard, StatusBadge, EmptyState, Money, OverheadTag, SectionTitle } from "@/components/shared/Bits";
 import { GoldButton } from "@/components/shared/Inputs";
@@ -13,6 +14,7 @@ import { toast } from "sonner";
 import { ArrowLeft, Pencil, Plus, Sparkles, Loader2, AlertTriangle } from "lucide-react";
 
 export default function SiteDetail() {
+  const { can } = useAuth();
   const { id } = useParams();
   const qc = useQueryClient();
   const [edit, setEdit] = useState(false);
@@ -28,7 +30,7 @@ export default function SiteDetail() {
     <div data-testid="site-detail-page">
       <Link to="/santiyeler" className="inline-flex items-center gap-1 text-sm text-charcoal-light hover:text-gold mb-4"><ArrowLeft className="w-4 h-4" /> Şantiyeler</Link>
       <PageHeader eyebrow={s.customer_name || "Müşteri atanmadı"} title={s.name} subtitle={`${s.location || "-"} · ${fmtDate(s.start_date)} → ${fmtDate(s.end_date)}`}
-        actions={<><StatusBadge status={s.status} className="self-center" /><GoldButton variant="outline" onClick={() => setEdit(true)} data-testid="edit-site-button"><Pencil className="w-4 h-4" /> Düzenle</GoldButton><GoldButton onClick={() => setAddTx(true)} data-testid="site-add-tx-button"><Plus className="w-4 h-4" /> Gelir/Gider</GoldButton></>} />
+        actions={<><StatusBadge status={s.status} className="self-center" />{can("edit_sites") && <GoldButton variant="outline" onClick={() => setEdit(true)} data-testid="edit-site-button"><Pencil className="w-4 h-4" /> Düzenle</GoldButton>}<GoldButton onClick={() => setAddTx(true)} data-testid="site-add-tx-button"><Plus className="w-4 h-4" /> Gelir/Gider</GoldButton></>} />
       {warn && <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 flex items-center gap-3 text-sm text-red-800" data-testid="deviation-warning"><AlertTriangle className="w-5 h-5 shrink-0" /><span><strong>İlerleme-maliyet sapması:</strong> Bütçenin %{sm.budget_used_percent}'i harcandı, fiziksel ilerleme %{sm.progress_percent}. Sapma {sm.deviation} puan.</span></div>}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
         <StatCard label="Sözleşme Bedeli" value={fmtTL(sm.contract_amount)} hint={`Net (−%6): ${fmtTL(sm.net_contract)}`} testId="site-stat-contract" />

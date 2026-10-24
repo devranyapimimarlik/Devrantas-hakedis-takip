@@ -57,6 +57,7 @@ export default function App() {
             <Route path="/islemler" element={<Transactions />} />
             <Route path="/hakedis" element={<ProgressPayments />} />
             <Route path="/hakedis/yeni" element={<NewProgress />} />
+            <Route path="/hakedis/:id/duzenle" element={<NewProgress />} />
             <Route path="/hakedis/:id" element={<ProgressDetail />} />
             <Route path="/teklifler" element={<Proposals />} />
             <Route path="/sozlesmeler" element={<Contracts />} />

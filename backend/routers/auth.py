@@ -3,7 +3,8 @@ from fastapi import APIRouter, HTTPException, Request, Response, Depends
 from pydantic import BaseModel, EmailStr
 from datetime import datetime, timezone, timedelta
 from core import (db, hash_password, verify_password, create_access_token, create_refresh_token,
-                  set_auth_cookies, public_user, get_current_user, require_role, new_id, now_iso, ROLES)
+                  set_auth_cookies, public_user, get_current_user, require_role, new_id, now_iso, ROLES,
+                  PERMISSIONS, DEFAULT_PERMISSIONS, get_permissions, invalidate_permissions, user_permissions)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -70,7 +71,29 @@ async def logout(response: Response):
 
 @router.get("/me")
 async def me(user: dict = Depends(get_current_user)):
-    return user
+    return {**user, "permissions": await user_permissions(user)}
+
+
+@router.get("/permissions")
+async def list_permissions(user: dict = Depends(require_role("yonetici"))):
+    return {"labels": PERMISSIONS, "roles": await get_permissions(), "defaults": DEFAULT_PERMISSIONS}
+
+
+class PermIn(BaseModel):
+    roles: dict
+
+
+@router.put("/permissions")
+async def set_permissions(data: PermIn, user: dict = Depends(require_role("yonetici"))):
+    clean = {}
+    for role, perms in data.roles.items():
+        if role not in DEFAULT_PERMISSIONS or not isinstance(perms, dict):
+            continue
+        clean[role] = {k: bool(perms.get(k, DEFAULT_PERMISSIONS[role][k])) for k in PERMISSIONS}
+    from core import db
+    await db.settings.update_one({"id": "permissions"}, {"$set": {"id": "permissions", **clean, "updated_at": now_iso(), "updated_by": user["id"]}}, upsert=True)
+    invalidate_permissions()
+    return {"roles": await get_permissions()}
 
 
 @router.get("/users")

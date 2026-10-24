@@ -8,6 +8,7 @@ import { NInput, NSelect, GoldButton } from "@/components/shared/Inputs";
 import { toast } from "sonner";
 import { Trash2, Plus } from "lucide-react";
 import { DataTransfer } from "@/components/shared/DataTransfer";
+import { PermissionsMatrix } from "@/components/shared/PermissionsMatrix";
 
 export function Users() {
   const qc = useQueryClient();
@@ -38,6 +39,7 @@ export function Users() {
             {u.id !== user.id && <button onClick={() => window.confirm("Kullanıcı silinsin mi?") && del.mutate(u.id)} className="p-2 rounded-full hover:bg-red-50 text-red-700" data-testid={`delete-user-${u.id}`}><Trash2 className="w-4 h-4" /></button>}
           </div>))}
       </div>
+      <PermissionsMatrix />
       <DataTransfer />
     </div>
   );

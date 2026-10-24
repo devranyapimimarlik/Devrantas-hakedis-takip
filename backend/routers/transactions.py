@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional
-from core import db, get_current_user, require_role, new_id, now_iso
+from core import db, get_current_user, require_perm, new_id, now_iso
 from routers.push import send_push
 from pymongo.errors import DuplicateKeyError
 
@@ -133,8 +133,71 @@ async def create_transaction(data: TransactionIn, background: BackgroundTasks, u
     return enriched
 
 
+class TransactionEdit(BaseModel):
+    category: Optional[str] = None
+    amount: Optional[float] = None
+    date: Optional[str] = None
+    description: Optional[str] = None
+    kasa: Optional[str] = None
+    site_id: Optional[str] = None
+    account_id: Optional[str] = None
+    attachment_file_id: Optional[str] = None
+    check_due_date: Optional[str] = None
+    check_bank: Optional[str] = None
+    check_no: Optional[str] = None
+
+
+@router.put("/{tx_id}")
+async def update_transaction(tx_id: str, data: TransactionEdit, background: BackgroundTasks, user=Depends(require_perm("edit_transactions"))):
+    t = await db.transactions.find_one({"id": tx_id}, {"_id": 0})
+    if not t:
+        raise HTTPException(status_code=404, detail="İşlem bulunamadı")
+    if t.get("endorsed"):
+        raise HTTPException(status_code=400, detail="Çek ciro işlemi düzenlenemez; silip yeniden ciro edin")
+    upd = {k: v for k, v in data.model_dump().items() if v is not None}
+    if "amount" in upd and upd["amount"] <= 0:
+        raise HTTPException(status_code=400, detail="Tutar sıfırdan büyük olmalı")
+    if "kasa" in upd and upd["kasa"] not in ("nakit", "cek"):
+        raise HTTPException(status_code=400, detail="Kasa nakit veya çek olmalı")
+    for k in ("site_id", "account_id", "attachment_file_id", "check_due_date", "description"):
+        if k in data.model_fields_set and getattr(data, k) in ("", None):
+            upd[k] = None if k != "description" else ""
+    cats = INCOME_CATEGORIES if t["type"] == "gelir" else EXPENSE_CATEGORIES
+    if "category" in upd and upd["category"] not in cats:
+        raise HTTPException(status_code=400, detail="Geçersiz kategori")
+    changed = {k: v for k, v in upd.items() if t.get(k) != v}
+    if not changed:
+        sites, accounts = await _lookups()
+        return await _enrich(t, sites, accounts)
+    changed.update({"edited_by": user["id"], "edited_by_name": user["name"], "edited_at": now_iso(),
+                    "edit_log": (t.get("edit_log") or [])[-19:] + [{"at": now_iso(), "by": user["name"], "before": {k: t.get(k) for k in changed}}]})
+    money_fields = {"amount", "kasa", "category", "account_id", "site_id", "date"}
+    reapprove = t["type"] == "gider" and user["role"] != "yonetici" and t.get("status") == "onaylandi" and bool(money_fields & set(changed))
+    if reapprove:
+        changed.update({"status": "onay_bekliyor", "approved_by": None, "approved_by_name": None, "approved_at": None})
+    await db.transactions.update_one({"id": tx_id}, {"$set": changed})
+    if t.get("check_id"):
+        cupd = {}
+        if "amount" in changed: cupd["amount"] = changed["amount"]
+        if "check_due_date" in changed and changed["check_due_date"]: cupd["due_date"] = changed["check_due_date"]
+        if "check_bank" in changed: cupd["bank"] = changed["check_bank"]
+        if "check_no" in changed: cupd["check_no"] = changed["check_no"]
+        if cupd:
+            await db.checks.update_one({"id": t["check_id"]}, {"$set": cupd})
+            if "due_date" in cupd:
+                await db.reminders.update_many({"source_id": t["check_id"]}, {"$set": {"due_date": cupd["due_date"]}})
+    if t.get("progress_payment_id"):
+        from routers.progress import close_if_paid
+        await close_if_paid(t["progress_payment_id"])
+    if reapprove:
+        background.add_task(send_push, None, "Düzenlenen gider onay bekliyor", f"{tl(changed.get('amount', t['amount']))} · {changed.get('category', t['category'])} — {user['name']}", "/islemler?tab=onay", f"tx-{tx_id}", ["yonetici"])
+    doc = await db.transactions.find_one({"id": tx_id}, {"_id": 0})
+    sites, accounts = await _lookups()
+    return await _enrich(doc, sites, accounts)
+
+
 @router.post("/{tx_id}/approve")
-async def approve(tx_id: str, background: BackgroundTasks, user=Depends(require_role("yonetici"))):
+async def approve(tx_id: str, background: BackgroundTasks, user=Depends(require_perm("approve_expenses"))):
     res = await db.transactions.update_one({"id": tx_id, "status": "onay_bekliyor"},
                                            {"$set": {"status": "onaylandi", "approved_by": user["id"],
                                                      "approved_by_name": user["name"], "approved_at": now_iso()}})
@@ -150,7 +213,7 @@ async def approve(tx_id: str, background: BackgroundTasks, user=Depends(require_
 
 
 @router.post("/{tx_id}/reject")
-async def reject(tx_id: str, data: RejectIn, background: BackgroundTasks, user=Depends(require_role("yonetici"))):
+async def reject(tx_id: str, data: RejectIn, background: BackgroundTasks, user=Depends(require_perm("approve_expenses"))):
     res = await db.transactions.update_one({"id": tx_id, "status": "onay_bekliyor"},
                                            {"$set": {"status": "reddedildi", "approved_by": user["id"],
                                                      "approved_by_name": user["name"], "approved_at": now_iso(),

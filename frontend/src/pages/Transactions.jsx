@@ -11,11 +11,12 @@ import { NInput, NSelect, NTextarea, GoldButton, Chip } from "@/components/share
 import { FileUpload, AttachmentButton } from "@/components/shared/FileUpload";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Plus, Check, X, Trash2, ShieldAlert } from "lucide-react";
+import { Plus, Pencil, Check, X, Trash2, ShieldAlert } from "lucide-react";
 
-export function TransactionForm({ defaults = {}, onDone }) {
+export function TransactionForm({ defaults = {}, onDone, editTx = null }) {
   const qc = useQueryClient();
-  const [f, setF] = useState({ type: "gider", category: "Malzeme", amount: "", date: today(), description: "", kasa: "", site_id: "", account_id: "", attachment_file_id: null, check_due_date: "", check_bank: "", check_no: "", ...defaults });
+  const isEdit = !!editTx;
+  const [f, setF] = useState({ type: "gider", category: "Malzeme", amount: "", date: today(), description: "", kasa: "", site_id: "", account_id: "", attachment_file_id: null, check_due_date: "", check_bank: "", check_no: "", ...defaults , ...(editTx ? { ...editTx, amount: String(editTx.amount), site_id: editTx.site_id || "", account_id: editTx.account_id || "", check_due_date: editTx.check_due_date || "", description: editTx.description || "" } : {}) });
   const [split, setSplit] = useState({ nakit: "", cek: "" });
   const [localFile, setLocalFile] = useState(null);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
@@ -31,6 +32,11 @@ export function TransactionForm({ defaults = {}, onDone }) {
     toast.info(`Çevrimdışı kaydedildi (${list.length}) — bağlantı gelince otomatik gönderilecek`);
     onDone?.();
   };
+  const edit = useMutation({
+    mutationFn: (body) => api.put(`/transactions/${editTx.id}`, body).then((r) => r.data),
+    onSuccess: (d) => { ["transactions", "dashboard", "sites", "pending-count", "accounts", "site", "kasa", "reports", "reminders", "checks"].forEach((k) => qc.invalidateQueries({ queryKey: [k] })); toast.success(d.status === "onay_bekliyor" && editTx.status === "onaylandi" ? "Düzeltildi — yeniden yönetici onayı bekliyor" : "İşlem düzeltildi"); onDone?.(); },
+    onError: (e) => toast.error(errMsg(e)),
+  });
   const m = useMutation({
     mutationFn: async (raw) => {
       const list = withKeys(raw);
@@ -48,6 +54,7 @@ export function TransactionForm({ defaults = {}, onDone }) {
     if (isSub && !f.account_id) return toast.error("Taşeron seçin");
     if (isIncome && !f.account_id) return toast.error("Müşteri seçin");
     const base = { ...f, site_id: f.site_id || null, account_id: f.account_id || null, check_due_date: f.check_due_date || null };
+    if (isEdit) { const { id, type, status, created_by, created_by_name, created_at, approved_by, approved_by_name, approved_at, reject_reason, check_id, progress_payment_id, site_name, account_name, edit_log, edited_by, edited_by_name, edited_at, client_key, endorsed, ...body } = base; return edit.mutate({ ...body, amount: Number(f.amount), description: f.description || "" }); }
     if (f.kasa === "karma") {
       const n = Number(split.nakit || 0), c = Number(split.cek || 0);
       if (n <= 0 || c <= 0) return toast.error("Nakit ve çek tutarlarını girin");
@@ -57,8 +64,8 @@ export function TransactionForm({ defaults = {}, onDone }) {
   const hasCek = f.kasa === "cek" || f.kasa === "karma";
   return (
     <form onSubmit={submit} className="space-y-4 min-w-0 max-w-full overflow-x-hidden" data-testid="transaction-form">
-      <VoiceExpense onResult={(r) => setF((p) => ({ ...p, type: r.type || p.type, category: r.category || p.category, amount: r.amount != null ? String(r.amount) : p.amount, site_id: r.site_id || p.site_id, account_id: r.account_id || "", kasa: r.kasa || p.kasa, description: r.description || p.description }))} />
-      <div className="grid grid-cols-2 gap-2">
+      {!isEdit && <VoiceExpense onResult={(r) => setF((p) => ({ ...p, type: r.type || p.type, category: r.category || p.category, amount: r.amount != null ? String(r.amount) : p.amount, site_id: r.site_id || p.site_id, account_id: r.account_id || "", kasa: r.kasa || p.kasa, description: r.description || p.description }))} />}
+      <div className={`grid grid-cols-2 gap-2 ${isEdit ? "hidden" : ""}`}>
         {["gider", "gelir"].map((t) => <Chip key={t} active={f.type === t} onClick={() => setF({ ...f, type: t, category: t === "gider" ? "Malzeme" : "Hakediş Tahsilatı", account_id: "" })} className="w-full" data-testid={`tx-type-${t}`}>{t === "gider" ? "Ödeme (Gider)" : "Tahsilat (Gelir)"}</Chip>)}
       </div>
       {!isIncome && <p className="text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-3 py-2 flex items-center gap-2"><ShieldAlert className="w-4 h-4 shrink-0" /> Ödemeler yönetici onayı olmadan şantiye bakiyesine yansımaz.</p>}
@@ -72,7 +79,7 @@ export function TransactionForm({ defaults = {}, onDone }) {
         <Field label="Kasa (zorunlu)">
           <NSelect value={f.kasa} onChange={set("kasa")} required data-testid="tx-kasa-select">
             <option value="">Kasa seçin</option><option value="nakit">Devrantaş Nakit</option><option value="cek">Devrantaş Çek</option>
-            {!isIncome && <option value="karma">Karma (Nakit + Çek)</option>}
+            {!isIncome && !isEdit && <option value="karma">Karma (Nakit + Çek)</option>}
           </NSelect>
         </Field>
         {f.kasa === "karma" ? (<>
@@ -90,15 +97,16 @@ export function TransactionForm({ defaults = {}, onDone }) {
       )}
       <Field label="Açıklama"><NTextarea value={f.description} onChange={set("description")} placeholder={isSub ? "ör. Hakediş No 2 ödemesi" : "Açıklama"} data-testid="tx-desc-input" /></Field>
       <FileUpload value={f.attachment_file_id} onChange={(id) => setF({ ...f, attachment_file_id: id })} localFile={localFile} onLocalFile={setLocalFile} label={isIncome ? "Tahsilat Dekontu / Çek Fotoğrafı" : "Dekont / Fiş Fotoğrafı"} testId="tx-attachment" />
-      <GoldButton type="submit" disabled={m.isPending} className="w-full" data-testid="tx-submit-button">{isIncome ? "Tahsilatı Kaydet" : "Ödemeyi Kaydet"}</GoldButton>
+      <GoldButton type="submit" disabled={m.isPending} className="w-full" data-testid="tx-submit-button">{isEdit ? "Düzeltmeyi Kaydet" : isIncome ? "Tahsilatı Kaydet" : "Ödemeyi Kaydet"}</GoldButton>
     </form>
   );
 }
 
 export default function Transactions() {
   const qc = useQueryClient();
-  const { isManager } = useAuth();
+  const { isManager, can } = useAuth();
   const [sp, setSp] = useSearchParams();
+  const [editTx, setEditTx] = useState(null);
   const tab = sp.get("tab") || (sp.get("status") === "onay_bekliyor" ? "bekleyen" : "tumu");
   const [open, setOpen] = useState(false);
   const { data = [], isLoading } = useQuery({ queryKey: ["transactions"], queryFn: () => api.get("/transactions").then((r) => r.data) });
@@ -136,13 +144,14 @@ export default function Transactions() {
               </div>
               <div className="flex flex-col items-end sm:flex-row sm:items-center gap-2 shrink-0">
                 <Money value={t.type === "gider" ? -t.amount : t.amount} signed className="text-base sm:text-lg font-semibold whitespace-nowrap" />
-                {t.status === "onay_bekliyor" && isManager && (
+                {t.status === "onay_bekliyor" && can("approve_expenses") && (
                   <div className="flex flex-col sm:flex-row gap-1">
                     <button onClick={() => approve.mutate(t.id)} className="h-9 px-3 rounded-full bg-emerald-600 text-white text-xs font-semibold inline-flex items-center gap-1 hover:bg-emerald-700" data-testid={`approve-expense-${t.id}`}><Check className="w-3.5 h-3.5" /> Onayla</button>
                     <button onClick={() => { const r = window.prompt("Red nedeni (isteğe bağlı):") ?? null; if (r !== null) reject.mutate({ id: t.id, reason: r }); }} className="h-9 px-3 rounded-full bg-white border border-red-200 text-red-700 text-xs font-semibold inline-flex items-center gap-1 hover:bg-red-50" data-testid={`reject-expense-${t.id}`}><X className="w-3.5 h-3.5" /> Reddet</button>
                   </div>
                 )}
-                {(t.status !== "onaylandi" || isManager) && <button onClick={() => window.confirm("Silinsin mi?") && del.mutate(t.id)} className="p-2 rounded-full hover:bg-red-50 text-charcoal-muted hover:text-red-700" data-testid={`delete-tx-${t.id}`}><Trash2 className="w-4 h-4" /></button>}
+                {can("edit_transactions") && !t.endorsed && <button onClick={() => setEditTx(t)} className="p-2 rounded-full hover:bg-gold-bg text-charcoal-muted hover:text-gold" title="Düzelt" data-testid={`edit-tx-${t.id}`}><Pencil className="w-4 h-4" /></button>}
+                {(t.status !== "onaylandi" || can("delete_transactions")) && <button onClick={() => window.confirm("Silinsin mi?") && del.mutate(t.id)} className="p-2 rounded-full hover:bg-red-50 text-charcoal-muted hover:text-red-700" data-testid={`delete-tx-${t.id}`}><Trash2 className="w-4 h-4" /></button>}
               </div>
             </div>
           ))}
@@ -150,6 +159,15 @@ export default function Transactions() {
       )}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-xl w-[calc(100vw-1rem)] sm:w-full max-h-[90vh] overflow-y-auto overflow-x-hidden"><DialogHeader><DialogTitle className="font-serif text-2xl">Yeni Gelir / Gider</DialogTitle></DialogHeader><TransactionForm onDone={() => setOpen(false)} /></DialogContent>
+      </Dialog>
+      <Dialog open={!!editTx} onOpenChange={(o) => !o && setEditTx(null)}>
+        <DialogContent className="max-w-xl w-[calc(100vw-1rem)] sm:w-full max-h-[90vh] overflow-y-auto overflow-x-hidden" data-testid="edit-tx-dialog"><DialogHeader><DialogTitle className="font-serif text-2xl">{editTx?.type === "gelir" ? "Tahsilatı Düzelt" : "Gideri Düzelt"}</DialogTitle></DialogHeader>
+          {editTx && <>
+            {editTx.type === "gider" && editTx.status === "onaylandi" && !isManager && <p className="text-xs text-amber-800 bg-amber-50 rounded-xl px-3 py-2 mb-3">Tutar, kasa, kategori veya şantiye değişirse gider yeniden yönetici onayına düşer.</p>}
+            {editTx.edit_log?.length > 0 && <p className="text-[11px] text-charcoal-light mb-3" data-testid="edit-tx-history">Son düzeltme: {editTx.edited_by_name} · {new Date(editTx.edited_at).toLocaleString("tr-TR")}</p>}
+            <TransactionForm key={editTx.id} editTx={editTx} onDone={() => setEditTx(null)} />
+          </>}
+        </DialogContent>
       </Dialog>
     </div>
   );

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, errMsg } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import { fmtTL } from "@/lib/format";
 import { PageHeader, EmptyState, Field, Money } from "@/components/shared/Bits";
 import { NInput, NSelect, NTextarea, GoldButton } from "@/components/shared/Inputs";
@@ -56,6 +57,7 @@ function AssignDialog({ account, onClose }) {
 }
 
 export default function Accounts({ type }) {
+  const { can } = useAuth();
   const qc = useQueryClient();
   const nav = useNavigate();
   const params = useParams();
@@ -83,7 +85,7 @@ export default function Accounts({ type }) {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0"><h3 className="text-xl font-semibold text-charcoal truncate">{a.name}</h3><p className="text-sm text-charcoal-light">{a.phone || a.specialty || a.email || "-"}</p></div>
                 <div className="flex gap-1 shrink-0">
-                  <button onClick={() => setDlg({ mode: "edit", account: a })} className="p-2 rounded-full hover:bg-gold-bg" data-testid={`edit-account-${a.id}`}><Pencil className="w-4 h-4" /></button>
+                  {can("edit_accounts") && <button onClick={() => setDlg({ mode: "edit", account: a })} className="p-2 rounded-full hover:bg-gold-bg" data-testid={`edit-account-${a.id}`}><Pencil className="w-4 h-4" /></button>}
                   <button onClick={() => window.confirm("Silinsin mi?") && del.mutate(a.id)} className="p-2 rounded-full hover:bg-red-50 text-red-700" data-testid={`delete-account-${a.id}`}><Trash2 className="w-4 h-4" /></button>
                 </div>
               </div>

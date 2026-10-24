@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
-from core import db, get_current_user, new_id, now_iso, site_summary, OVERHEAD_RATE
+from core import db, get_current_user, new_id, now_iso, site_summary, OVERHEAD_RATE, require_perm
 
 router = APIRouter(prefix="/sites", tags=["sites"])
 
@@ -50,7 +50,7 @@ async def get_site(site_id: str, user=Depends(get_current_user)):
 
 
 @router.put("/{site_id}")
-async def update_site(site_id: str, data: SiteIn, user=Depends(get_current_user)):
+async def update_site(site_id: str, data: SiteIn, user=Depends(require_perm("edit_sites"))):
     res = await db.sites.update_one({"id": site_id}, {"$set": data.model_dump()})
     if not res.matched_count:
         raise HTTPException(status_code=404, detail="Şantiye bulunamadı")

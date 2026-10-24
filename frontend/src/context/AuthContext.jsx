@@ -25,7 +25,9 @@ export function AuthProvider({ children }) {
     setUser(false);
   }, []);
 
-  return <AuthCtx.Provider value={{ user, login, logout, isManager: user?.role === "yonetici" }}>{children}</AuthCtx.Provider>;
+  const isManager = user?.role === "yonetici";
+  const can = (perm) => isManager || !!user?.permissions?.[perm];
+  return <AuthCtx.Provider value={{ user, login, logout, isManager, can }}>{children}</AuthCtx.Provider>;
 }
 
 export const useAuth = () => useContext(AuthCtx);

@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useState, useMemo, useEffect } from "react";
+import { Link, useNavigate, useSearchParams, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, errMsg } from "@/lib/api";
 import { fmtTL, fmtDate, today, STATUS_LABELS } from "@/lib/format";
@@ -43,6 +43,13 @@ export function NewProgress() {
   const nav = useNavigate();
   const qc = useQueryClient();
   const [sp] = useSearchParams();
+  const { id: editId } = useParams();
+  const { data: existing } = useQuery({ queryKey: ["progress", editId], queryFn: () => api.get(`/progress-payments/${editId}`).then((r) => r.data), enabled: !!editId });
+  useEffect(() => {
+    if (!existing) return;
+    setF((p) => ({ ...p, site_id: existing.site_id, account_id: existing.account_id, type: existing.type, date: existing.date, period: existing.period || "", vat_rate: existing.vat_rate, apply_overhead: existing.apply_overhead, previous_deduction: existing.previous_deduction || 0, retention_rate: existing.retention_rate || 0, notes: existing.notes || "", terms: existing.terms || "", technical_spec: existing.technical_spec || "" }));
+    setItems(existing.items?.length ? existing.items : [{ description: "", unit: "m2", quantity: "", unit_price: "" }]);
+  }, [existing]);
   const [f, setF] = useState({ site_id: sp.get("site_id") || "", account_id: sp.get("account_id") || "", type: sp.get("type") || "taseron", date: today(), period: "", vat_rate: 20, apply_overhead: true, previous_deduction: 0, retention_rate: 0, notes: "", terms: "", technical_spec: "" });
   const [items, setItems] = useState([{ description: "", unit: "m2", quantity: "", unit_price: "" }]);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
@@ -57,8 +64,8 @@ export function NewProgress() {
     return { sub, oh, ret, base, vat, net: base + vat };
   }, [items, f]);
   const m = useMutation({
-    mutationFn: (b) => api.post("/progress-payments", b),
-    onSuccess: (r) => { qc.invalidateQueries({ queryKey: ["progress"] }); toast.success("Hakediş oluşturuldu"); nav(`/hakedis/${r.data.id}`); },
+    mutationFn: (b) => (editId ? api.put(`/progress-payments/${editId}`, b) : api.post("/progress-payments", b)),
+    onSuccess: (r) => { qc.invalidateQueries({ queryKey: ["progress"] }); qc.invalidateQueries({ queryKey: ["accounts"] }); qc.invalidateQueries({ queryKey: ["sites"] }); toast.success(editId ? "Hakediş düzeltildi" : "Hakediş oluşturuldu"); nav(`/hakedis/${r.data.id}`); },
     onError: (e) => toast.error(errMsg(e)),
   });
   const submit = (e) => {
@@ -71,7 +78,7 @@ export function NewProgress() {
   return (
     <div data-testid="new-progress-page">
       <Link to="/hakedis" className="inline-flex items-center gap-1 text-sm text-charcoal-light hover:text-gold mb-4"><ArrowLeft className="w-4 h-4" /> Hakedişler</Link>
-      <PageHeader title="Yeni Hakediş" subtitle="Metraj × birim fiyat, otomatik %6 genel gider kesintisi ve KDV ile net ödenecek tutar hesaplanır." />
+      <PageHeader title={editId ? `Hakediş Düzelt #${existing?.number ?? ""}` : "Yeni Hakediş"} subtitle="Metraj × birim fiyat, otomatik %6 genel gider kesintisi ve KDV ile net ödenecek tutar hesaplanır." />
       <form onSubmit={submit} className="gold-card p-5 md:p-8 space-y-6" data-testid="progress-form">
         <div className="flex gap-2">{["taseron", "musteri"].map((t) => <Chip key={t} active={f.type === t} onClick={() => setF({ ...f, type: t, account_id: "" })} data-testid={`progress-type-${t}`}>{STATUS_LABELS[t]} Hakedişi</Chip>)}</div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

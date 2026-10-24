@@ -16,7 +16,7 @@ export default function ProgressDetail() {
   const { id } = useParams();
   const nav = useNavigate();
   const qc = useQueryClient();
-  const { user, isManager } = useAuth();
+  const { user, isManager, can } = useAuth();
   const [payOpen, setPayOpen] = useState(false);
   const { data: h } = useQuery({ queryKey: ["progress", id], queryFn: () => api.get(`/progress-payments/${id}`).then((r) => r.data) });
   const { data: pays } = useQuery({ queryKey: ["progress-pays", id], queryFn: () => api.get(`/progress-payments/${id}/payments`).then((r) => r.data) });
@@ -37,6 +37,7 @@ export default function ProgressDetail() {
           {canStatus && h.status === "taslak" && <GoldButton onClick={() => status.mutate("onaylandi")} data-testid="progress-approve-button">Onayla</GoldButton>}
           {canStatus && h.status === "onaylandi" && <GoldButton onClick={() => status.mutate("odendi")} data-testid="progress-paid-button">Ödendi İşaretle</GoldButton>}
           {h.status !== "taslak" && <GoldButton onClick={() => setPayOpen(true)} data-testid="progress-pay-button"><Wallet className="w-4 h-4" /> {h.type === "taseron" ? "Ödeme Yap" : "Tahsilat Al"}</GoldButton>}
+          {can("edit_progress") && h.status !== "odendi" && <GoldButton variant="outline" onClick={() => nav(`/hakedis/${h.id}/duzenle`)} data-testid="progress-edit-button"><Pencil className="w-4 h-4" /> Düzenle</GoldButton>}
           {isManager && <button onClick={() => window.confirm("Hakediş silinsin mi?") && del.mutate()} className="p-2 rounded-full hover:bg-red-50 text-red-700" data-testid="progress-delete-button"><Trash2 className="w-5 h-5" /></button>}
         </>} />
       <div className="gold-card p-5 md:p-8">

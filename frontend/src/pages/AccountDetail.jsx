@@ -22,16 +22,17 @@ export default function AccountDetail() {
           <GoldButton onClick={() => pdf(true)} data-testid="statement-detailed-pdf-button"><FileDown className="w-4 h-4" /> Detaylı Ekstre PDF</GoldButton>
         </>} />
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-        <StatCard label="Toplam Hakediş (Borç)" value={fmtTL(a.total_progress)} testId="stat-total-progress" />
-        <StatCard label={type === "musteri" ? "Toplam Tahsilat" : "Toplam Ödenen"} value={fmtTL(a.total_paid)} tone="green" testId="stat-total-paid" delay={60} />
-        <StatCard label="Kalan Bakiye" value={fmtTL(a.balance)} tone={a.balance > 0 ? "amber" : "green"} hint={a.balance > 0 ? (type === "musteri" ? "Müşteriden alacak" : "Taşerona borç") : "Kapanmış"} testId="stat-balance" delay={120} />
+        <StatCard label={type === "musteri" ? "Toplam Hakediş (Müşteri Borcu)" : "Toplam Hakediş (Taşeron Alacağı)"} value={fmtTL(a.total_progress)} testId="stat-total-progress" />
+        <StatCard label={type === "musteri" ? "Toplam Tahsilat (Müşteri Alacağı)" : "Ödenen Avans (Taşeron Borcu)"} value={fmtTL(a.total_paid)} tone="green" testId="stat-total-paid" delay={60} />
+        <StatCard label={type === "musteri" ? "Net: Hakediş − Tahsilat" : "Net: Hakediş − Avans"} value={fmtTL(Math.abs(a.balance))} tone={a.balance === 0 ? "green" : a.balance > 0 ? "amber" : "red"}
+          hint={a.balance === 0 ? "Hesap kapalı" : type === "musteri" ? (a.balance > 0 ? "Müşteriden alacağımız" : "Müşteri alacaklı (fazla tahsilat / avans)") : (a.balance > 0 ? "Taşerona borcumuz" : "Taşeron avans borçlu (hakediş bekleniyor)")} testId="stat-balance" delay={120} />
       </div>
       <div className="gold-card p-5 md:p-6">
         <h2 className="text-xl font-semibold mb-4">Hesap Hareketleri</h2>
         {rows.length === 0 ? <EmptyState title="Hareket yok" /> : (
           <div className="overflow-x-auto -mx-5 md:mx-0">
             <table className="w-full text-sm min-w-[640px]" data-testid="statement-table">
-              <thead><tr className="text-left label-gold border-b border-gold-border"><th className="py-2 px-3">Tarih</th><th className="py-2 px-3">Açıklama</th><th className="py-2 px-3 text-right">Borç</th><th className="py-2 px-3 text-right">Alacak</th><th className="py-2 px-3 text-right">Bakiye</th></tr></thead>
+              <thead><tr className="text-left label-gold border-b border-gold-border"><th className="py-2 px-3">Tarih</th><th className="py-2 px-3">Açıklama</th><th className="py-2 px-3 text-right">{type === "musteri" ? "Borç (Hakediş)" : "Borç (Avans)"}</th><th className="py-2 px-3 text-right">{type === "musteri" ? "Alacak (Tahsilat)" : "Alacak (Hakediş)"}</th><th className="py-2 px-3 text-right">Bakiye</th></tr></thead>
               <tbody>{rows.map((r, i) => (
                 <tr key={i} className="border-b border-stone-100 hover:bg-gold-bg/30">
                   <td className="py-2.5 px-3 font-mono text-xs">{fmtDate(r.date)}</td><td className="py-2.5 px-3">{r.description}</td>
