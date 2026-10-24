@@ -1,0 +1,41 @@
+{
+  "name": "devrantas-desktop",
+  "productName": "Devrantaş",
+  "version": "1.0.0",
+  "description": "Devrantaş Yapı Mimarlık — Windows masaüstü uygulaması",
+  "author": "Devrantaş Yapı Mimarlık",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win --publish never"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.devrantas.yapi",
+    "productName": "Devrantaş",
+    "copyright": "© Devrantaş Yapı Mimarlık",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": ["main.js", "offline.html", "build/icon.png"],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "build/icon.ico",
+      "executableName": "Devrantas",
+      "artifactName": "Devrantas-Setup-${version}.exe"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Devrantaş",
+      "installerLanguages": ["tr_TR"],
+      "language": "1055",
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}

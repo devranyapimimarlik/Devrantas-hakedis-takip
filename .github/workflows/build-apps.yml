@@ -1,0 +1,179 @@
+name: Uygulama Derlemeleri (Windows · Android · iOS TestFlight)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths:
+      - "desktop/**"
+      - "mobile/**"
+      - ".github/workflows/build-apps.yml"
+
+permissions:
+  contents: write
+
+env:
+  BUILD_NUMBER: ${{ github.run_number }}
+
+jobs:
+  windows:
+    name: Windows kurulum (.exe)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Bağımlılıklar
+        working-directory: desktop
+        run: npm install --no-audit --no-fund
+      - name: Derle (NSIS)
+        working-directory: desktop
+        run: npx electron-builder --win --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - name: Sabit isim
+        shell: bash
+        run: cp desktop/dist/Devrantas-Setup-*.exe Devrantas-Setup.exe
+      - uses: actions/upload-artifact@v4
+        with: { name: windows-setup, path: Devrantas-Setup.exe }
+
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17" }
+      - uses: android-actions/setup-android@v3
+      - name: Bağımlılıklar + Capacitor sync
+        working-directory: mobile
+        run: |
+          yarn install --frozen-lockfile
+          npx cap sync android
+      - name: Firebase (opsiyonel)
+        working-directory: mobile/android/app
+        env: { GSJ: "${{ secrets.GOOGLE_SERVICES_JSON }}" }
+        run: if [ -n "$GSJ" ]; then echo "$GSJ" > google-services.json; echo "google-services.json yazıldı"; fi
+      - name: İmza anahtarı
+        id: ks
+        working-directory: mobile/android
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > release.keystore
+            echo "KEYSTORE_PASSWORD=$KS_PASS" >> $GITHUB_ENV
+            echo "KEY_ALIAS=${KS_ALIAS:-devrantas}" >> $GITHUB_ENV
+            echo "generated=false" >> $GITHUB_OUTPUT
+          else
+            keytool -genkeypair -v -keystore release.keystore -alias devrantas -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass devrantas2026 -keypass devrantas2026 -dname "CN=Devrantas Yapi, O=Devrantas, C=TR"
+            echo "KEYSTORE_PASSWORD=devrantas2026" >> $GITHUB_ENV
+            echo "KEY_ALIAS=devrantas" >> $GITHUB_ENV
+            echo "generated=true" >> $GITHUB_OUTPUT
+            echo "::warning::ANDROID_KEYSTORE_BASE64 secret yok; geçici anahtar üretildi. Güncellemelerin üstüne kurulabilmesi için 'android-keystore' artifact'ini indirip base64 olarak secret'a ekleyin."
+          fi
+          echo "KEYSTORE_PATH=$PWD/release.keystore" >> $GITHUB_ENV
+          echo "KEY_PASSWORD=${KEYSTORE_PASSWORD:-}" >> $GITHUB_ENV
+      - name: Derle (APK)
+        working-directory: mobile/android
+        run: |
+          chmod +x gradlew
+          export KEY_PASSWORD="$KEYSTORE_PASSWORD"
+          ./gradlew assembleRelease --no-daemon
+          cp app/build/outputs/apk/release/app-release.apk ../../Devrantas.apk
+      - uses: actions/upload-artifact@v4
+        with: { name: android-apk, path: Devrantas.apk }
+      - uses: actions/upload-artifact@v4
+        if: steps.ks.outputs.generated == 'true'
+        with: { name: android-keystore, path: mobile/android/release.keystore, retention-days: 90 }
+
+  ios:
+    name: iOS → TestFlight
+    runs-on: macos-15
+    env:
+      ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      ASC_P8_BASE64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY_BASE64 }}
+      TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Anahtar kontrolü
+        id: chk
+        run: |
+          if [ -z "$ASC_KEY_ID" ] || [ -z "$ASC_ISSUER_ID" ] || [ -z "$ASC_P8_BASE64" ] || [ -z "$TEAM_ID" ]; then
+            echo "::warning::Apple secret'ları eksik (APP_STORE_CONNECT_KEY_ID / APP_STORE_CONNECT_ISSUER_ID / APP_STORE_CONNECT_PRIVATE_KEY_BASE64 / APPLE_TEAM_ID). iOS adımı atlandı."
+            echo "ready=false" >> $GITHUB_OUTPUT
+          else
+            echo "ready=true" >> $GITHUB_OUTPUT
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.chk.outputs.ready == 'true'
+        with: { node-version: 20 }
+      - uses: maxim-lobanov/setup-xcode@v1
+        if: steps.chk.outputs.ready == 'true'
+        with: { xcode-version: latest-stable }
+      - name: Bağımlılıklar + Capacitor sync + CocoaPods
+        if: steps.chk.outputs.ready == 'true'
+        working-directory: mobile
+        run: |
+          yarn install --frozen-lockfile
+          npx cap sync ios
+          cd ios/App && pod install
+      - name: App Store Connect API anahtarı
+        if: steps.chk.outputs.ready == 'true'
+        run: |
+          mkdir -p ~/private_keys
+          echo "$ASC_P8_BASE64" | base64 --decode > ~/private_keys/AuthKey_$ASC_KEY_ID.p8
+          sed -i '' "s/__TEAM_ID__/$TEAM_ID/" mobile/ios/App/ExportOptions.plist
+      - name: Sürüm / build numarası
+        if: steps.chk.outputs.ready == 'true'
+        working-directory: mobile/ios/App
+        run: agvtool new-version -all "$BUILD_NUMBER"
+      - name: Arşivle
+        if: steps.chk.outputs.ready == 'true'
+        working-directory: mobile/ios/App
+        run: |
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -destination 'generic/platform=iOS' \
+            -archivePath "$PWD/build/App.xcarchive" archive \
+            DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGN_STYLE=Automatic \
+            -allowProvisioningUpdates -allowProvisioningDeviceRegistration \
+            -authenticationKeyPath ~/private_keys/AuthKey_$ASC_KEY_ID.p8 -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+      - name: Dışa aktar ve TestFlight'a yükle
+        if: steps.chk.outputs.ready == 'true'
+        working-directory: mobile/ios/App
+        run: |
+          xcodebuild -exportArchive -archivePath "$PWD/build/App.xcarchive" -exportOptionsPlist ExportOptions.plist -exportPath "$PWD/build/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/private_keys/AuthKey_$ASC_KEY_ID.p8 -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+          echo "TestFlight'a yüklendi. İşlenmesi 5-15 dk sürer; App Store Connect → TestFlight sekmesinde görünür."
+      - uses: actions/upload-artifact@v4
+        if: steps.chk.outputs.ready == 'true'
+        with: { name: ios-export-logs, path: mobile/ios/App/build/export, if-no-files-found: ignore }
+
+  release:
+    name: İndirme bağlantılarını yayınla
+    needs: [windows, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: windows-setup, path: out }
+      - uses: actions/download-artifact@v4
+        with: { name: android-apk, path: out }
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "Devrantaş — güncel sürüm (build ${{ github.run_number }})"
+          body: |
+            **Windows:** `Devrantas-Setup.exe` indirip çalıştırın (SmartScreen uyarısında "Ek bilgi → Yine de çalıştır").
+            **Android:** `Devrantas.apk` indirip açın; "Bilinmeyen kaynaklara izin ver" deyin.
+            **iPhone:** TestFlight üzerinden dağıtılır (App Store Connect → TestFlight).
+          files: |
+            out/Devrantas-Setup.exe
+            out/Devrantas.apk
+          make_latest: true
+          fail_on_unmatched_files: false

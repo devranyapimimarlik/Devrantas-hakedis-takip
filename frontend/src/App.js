@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { SettingsProvider } from "@/context/SettingsContext";
 import Appearance from "@/pages/Appearance";
 import Install from "@/pages/Install";
+import Downloads from "@/pages/Downloads";
 import Portal from "@/pages/Portal";
 import AppLayout from "@/components/layout/AppLayout";
 import Login from "@/pages/Login";
@@ -71,6 +72,7 @@ export default function App() {
             <Route path="/sifre" element={<ChangePassword />} />
             <Route path="/ayarlar/gorunum" element={<Protected admin><Appearance /></Protected>} />
             <Route path="/telefona-kur" element={<Install />} />
+            <Route path="/indir" element={<Downloads />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

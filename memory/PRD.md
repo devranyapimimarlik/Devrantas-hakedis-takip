@@ -58,3 +58,11 @@
 ## 2026-06 — Genel gider hesabı düzeltmesi + Kalıcı adrese geçiş rehberi
 - %6 genel gider artık **tahsil edilen gelir** üzerinden hesaplanıyor (`realized_overhead`), Kâr/Zarar raporunda **Net kâr (gerçekleşen)** = tahsilat − %6 − gider. Sözleşme bazlı tahmin ayrı satırda ("Tahmini kâr (sözleşme bazlı)") korunuyor. Dashboard ve şantiye detayı ana stat "Gerçekleşen Kâr" oldu; Excel/PDF kolonları güncellendi; AI asistan bağlamı güncellendi.
 - Telefona Kur sayfasına `MigrationGuide` (kalıcı adres kopyala/aç, iPhone/Android eski kısayolu kaldır + yeniden ekle adımları) eklendi; QR ve adres artık kalıcı adresi (https://hakedis-takip-3.emergent.host) gösteriyor.
+
+## 2026-06 — Windows .exe + Android APK + iOS TestFlight (GitHub Actions)
+- `/app/desktop`: Electron kabuk (canlı adrese bağlanır, offline sayfası, Türkçe menü, bildirim izni), electron-builder NSIS (Devrantas-Setup.exe, x64, tr_TR).
+- `.github/workflows/build-apps.yml`: windows (electron-builder) · android (cap sync + gradle assembleRelease, keystore secret yoksa üretir ve artifact verir) · ios (cap sync + pod install + xcodebuild archive/exportArchive destination=upload → TestFlight; ASC API key secrets eksikse atlanır) · release (GitHub Release `latest`: Devrantas-Setup.exe, Devrantas.apk).
+- `mobile/ios/App/ExportOptions.plist` (app-store-connect, upload, automatic signing, __TEAM_ID__ sed ile), `mobile/android/app/build.gradle` env tabanlı imza + BUILD_NUMBER versionCode, `mobile/RELEASE.md`.
+- Backend: settings `github_repo`, `testflight_url` + `PUT /api/settings/distribution` (yönetici; repo formatı doğrulanır).
+- Frontend: `/indir` Downloads sayfası (3 platform kartı, indir linkleri `github.com/<repo>/releases/latest/download/...`, yönetici dağıtım formu, adım adım GitHub/Apple ASC API key/secrets rehberi), menüye "Uygulamayı indir" eklendi, Telefona Kur → İndir bağlantısı.
+- KULLANICI ADIMLARI (bekleyen): Save to GitHub → depo adını /indir'e yaz → Actions'ı etkinleştir → Apple secret'ları ekle → TestFlight Public Link'i /indir'e yapıştır.

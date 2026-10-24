@@ -12,7 +12,7 @@ FONT_DIR = Path(__file__).parent.parent / "fonts"
 DEFAULTS = {"company_name": "Devrantaş Yapı Mimarlık İnşaat Ltd. Şti.", "short_name": "Devrantaş", "tagline": "Yapı Mimarlık",
             "address": "Nurtanesi Sok. No: 3/1, Merkez Mah., Çekmeköy, İstanbul", "phone": "0533 482 57 02",
             "email": "Devrantasyapimimarlik@gmail.com", "tax_office": "", "tax_no": "", "iban": "",
-            "primary_color": "#B8860B", "logo_file_id": None}
+            "primary_color": "#B8860B", "logo_file_id": None, "github_repo": "", "testflight_url": ""}
 _cache = {"settings": None, "logo_path": None, "logo_file_id": None}
 
 
@@ -28,6 +28,13 @@ class SettingsIn(BaseModel):
     iban: Optional[str] = ""
     primary_color: str = "#B8860B"
     logo_file_id: Optional[str] = None
+    github_repo: Optional[str] = ""
+    testflight_url: Optional[str] = ""
+
+
+class DistributionIn(BaseModel):
+    github_repo: Optional[str] = ""
+    testflight_url: Optional[str] = ""
 
 
 async def get_settings() -> dict:
@@ -83,6 +90,19 @@ async def update_settings(data: SettingsIn, user=Depends(require_role("yonetici"
         raise HTTPException(status_code=400, detail="Renk #RRGGBB formatında olmalı")
     await db.settings.update_one({"id": "company"}, {"$set": {**data.model_dump(), "updated_at": now_iso(), "updated_by": user["id"]}}, upsert=True)
     _cache.update({"settings": None, "logo_path": None, "logo_file_id": None})
+    return await read_settings()
+
+
+@router.put("/distribution")
+async def update_distribution(data: DistributionIn, user=Depends(require_role("yonetici"))):
+    repo = (data.github_repo or "").strip().removeprefix("https://github.com/").strip("/")
+    if repo and not re.fullmatch(r"[\w.-]+/[\w.-]+", repo):
+        raise HTTPException(status_code=400, detail="GitHub deposu 'kullanici/depo' biçiminde olmalı")
+    tf = (data.testflight_url or "").strip()
+    if tf and not tf.startswith("https://"):
+        raise HTTPException(status_code=400, detail="TestFlight bağlantısı https:// ile başlamalı")
+    await db.settings.update_one({"id": "company"}, {"$set": {"github_repo": repo, "testflight_url": tf, "updated_at": now_iso(), "updated_by": user["id"]}}, upsert=True)
+    _cache.update({"settings": None})
     return await read_settings()
 
 

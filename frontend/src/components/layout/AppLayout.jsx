@@ -10,7 +10,7 @@ import { STATUS_LABELS } from "@/lib/format";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
   LayoutGrid, Building2, Users, HardHat, ReceiptText, FileText, BarChart3, Menu, LogOut, Bell,
-  FileSignature, Banknote, CalendarClock, Sparkles, ShieldCheck, Wallet, Activity, UserCog, KeyRound, Palette, Smartphone, CalendarDays,
+  FileSignature, Banknote, CalendarClock, Sparkles, ShieldCheck, Wallet, Activity, UserCog, KeyRound, Palette, Smartphone, CalendarDays, Download,
 } from "lucide-react";
 import { InstallBanner } from "@/components/shared/PwaInstall";
 import { OfflineBar } from "@/components/shared/OfflineQueue";
@@ -39,6 +39,7 @@ const MORE = [
   { to: "/yonetim/kullanicilar", label: "Yönetim (alt kullanıcılar ve yetkiler)", icon: UserCog, id: "users", admin: true },
   { to: "/ayarlar/gorunum", label: "Görünüm (logo ve renk)", icon: Palette, id: "appearance", admin: true },
   { to: "/telefona-kur", label: "Telefona kur (iOS / Android)", icon: Smartphone, id: "install" },
+  { to: "/indir", label: "Uygulamayı indir (Windows · APK · TestFlight)", icon: Download, id: "downloads" },
   { to: "/sifre", label: "Şifremi değiştir", icon: KeyRound, id: "password" },
 ];
 

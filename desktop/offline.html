@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8"><title>Devrantaş</title>
+<style>
+body{margin:0;font-family:Georgia,serif;background:#FDFBF7;color:#1C1917;display:flex;align-items:center;justify-content:center;height:100vh}
+.card{max-width:420px;text-align:center;padding:40px;border:1px solid #E7D9B5;border-radius:24px;background:#fff}
+h1{font-size:26px;margin:0 0 8px}p{color:#57534E;font-size:14px;line-height:1.5}
+button{margin-top:18px;background:#B8860B;color:#fff;border:0;border-radius:999px;padding:12px 26px;font-size:14px;cursor:pointer}
+button:hover{background:#8f6808}
+</style></head>
+<body><div class="card"><h1>Bağlantı yok</h1>
+<p>Devrantaş sunucusuna ulaşılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin. Kayıtlarınız sunucuda güvende.</p>
+<button onclick="location.href=new URLSearchParams(location.search).get('back')||'https://hakedis-takip-3.emergent.host'">Tekrar dene</button></div>
+<script>setTimeout(()=>{ if (navigator.onLine) location.href=new URLSearchParams(location.search).get('back')||'https://hakedis-takip-3.emergent.host' }, 15000)</script>
+</body></html>

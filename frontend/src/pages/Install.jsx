@@ -5,7 +5,8 @@ import { ApnsKeyCard } from "@/components/shared/ApnsKeyCard";
 import { MigrationGuide, LIVE_URL } from "@/components/shared/MigrationGuide";
 import { QRCodeSVG } from "qrcode.react";
 import { useSettings } from "@/context/SettingsContext";
-import { ShieldCheck, WifiOff, Bell, Palette } from "lucide-react";
+import { ShieldCheck, WifiOff, Bell, Palette, Download, ArrowRight } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const PERKS = [
   { icon: Palette, t: "Logonuz ve renginiz", d: "Ana ekran simgesi ve açılış ekranı firma logonuzla gelir." },
@@ -26,6 +27,7 @@ export default function Install() {
         <div className="bg-white p-3 rounded-2xl shadow-sm" data-testid="install-qr"><QRCodeSVG value={LIVE_URL + "/telefona-kur"} size={120} fgColor="#1F1B16" /><p className="text-[10px] text-center text-charcoal-light mt-1">Telefonla okutun</p></div>
       </div>
       <div className="mb-6"><MigrationGuide /></div>
+      <Link to="/indir" className="gold-card p-4 mb-6 flex items-center gap-3 hover:bg-gold-bg/40 transition-colors" data-testid="install-downloads-link"><Download className="w-5 h-5 text-gold" /><div className="flex-1"><p className="text-sm font-semibold">Windows (.exe), Android (APK) ve iPhone (TestFlight) kurulum paketleri</p><p className="text-xs text-charcoal-light">Masaüstü ve mağazasız telefon kurulumları için indirme sayfası</p></div><ArrowRight className="w-4 h-4 text-charcoal-muted" /></Link>
       <InstallGuide />
       <div className="mt-6 space-y-4"><PushToggle /><ApnsKeyCard /></div>
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
