@@ -2,8 +2,8 @@ name: Uygulama Derlemeleri (Windows · Android · iOS TestFlight)
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main, master]
+  push :       
+  branches: [main, master, conflict_241026_2355]
     paths:
       - "desktop/**"
       - "mobile/**"
