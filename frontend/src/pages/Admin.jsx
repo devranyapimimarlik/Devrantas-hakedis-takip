@@ -33,9 +33,9 @@ export function Users() {
       </form>
       <div className="space-y-3" data-testid="users-list">
         {data.map((u) => (
-          <div key={u.id} className="gold-card p-4 flex items-center gap-3" data-testid={`user-row-${u.id}`}>
-            <div className="flex-1 min-w-0"><p className="font-semibold truncate">{u.name} {u.id === user.id && <span className="text-xs text-gold">(siz)</span>}</p><p className="text-xs text-charcoal-light">{u.email} · {fmtDate(u.created_at)}</p></div>
-            <NSelect value={u.role} disabled={u.id === user.id} onChange={(e) => role.mutate({ id: u.id, role: e.target.value })} className="!w-40 !h-9" data-testid={`user-role-${u.id}`}>{["yonetici", "santiye_sefi", "muhasebe"].map((r) => <option key={r} value={r}>{STATUS_LABELS[r]}</option>)}</NSelect>
+          <div key={u.id} className="gold-card p-4 flex flex-wrap sm:flex-nowrap items-center gap-3" data-testid={`user-row-${u.id}`}>
+            <div className="flex-1 min-w-0"><p className="font-semibold truncate">{u.name} {u.id === user.id && <span className="text-xs text-gold">(siz)</span>}</p><p className="text-xs text-charcoal-light truncate">{u.email} · {fmtDate(u.created_at)}</p></div>
+            <NSelect value={u.role} disabled={u.id === user.id} onChange={(e) => role.mutate({ id: u.id, role: e.target.value })} className="!w-full sm:!w-40 !h-9 order-last sm:order-none" data-testid={`user-role-${u.id}`}>{["yonetici", "santiye_sefi", "muhasebe"].map((r) => <option key={r} value={r}>{STATUS_LABELS[r]}</option>)}</NSelect>
             {u.id !== user.id && <button onClick={() => window.confirm("Kullanıcı silinsin mi?") && del.mutate(u.id)} className="p-2 rounded-full hover:bg-red-50 text-red-700" data-testid={`delete-user-${u.id}`}><Trash2 className="w-4 h-4" /></button>}
           </div>))}
       </div>

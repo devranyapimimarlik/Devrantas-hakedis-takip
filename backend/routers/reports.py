@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from typing import Optional
 from datetime import date
-from core import db, get_current_user, site_summary, account_balance, r2, SUB_CATEGORIES
+from core import db, site_summary, account_balance, r2, SUB_CATEGORIES, require_perm
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -15,7 +15,7 @@ def _date_q(start, end):
 
 @router.get("")
 async def reports(start: Optional[str] = None, end: Optional[str] = None, site_id: Optional[str] = None,
-                  account_id: Optional[str] = None, user=Depends(get_current_user)):
+                  account_id: Optional[str] = None, user=Depends(require_perm("view_reports"))):
     tq = {"status": "onaylandi"}
     dq = _date_q(start, end)
     if dq: tq["date"] = dq
@@ -156,7 +156,7 @@ def _table_for(tab: str, d: dict):
 
 @router.get("/export")
 async def export_report(tab: str, format: str = "xlsx", start: Optional[str] = None, end: Optional[str] = None,
-                        site_id: Optional[str] = None, account_id: Optional[str] = None, user=Depends(get_current_user)):
+                        site_id: Optional[str] = None, account_id: Optional[str] = None, user=Depends(require_perm("view_reports"))):
     from fastapi import HTTPException
     from fastapi.responses import Response
     from excel import build_table

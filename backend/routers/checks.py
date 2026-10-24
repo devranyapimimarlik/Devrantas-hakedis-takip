@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional
 from datetime import date, timedelta
-from core import db, get_current_user, new_id, now_iso, today_str
+from core import db, get_current_user, new_id, now_iso, today_str, require_perm
 
 router = APIRouter(tags=["checks"])
 
@@ -68,7 +68,7 @@ async def create_check(data: CheckIn, user=Depends(get_current_user)):
 
 
 @router.put("/checks/{cid}")
-async def update_check(cid: str, data: CheckIn, user=Depends(get_current_user)):
+async def update_check(cid: str, data: CheckIn, user=Depends(require_perm("edit_checks"))):
     res = await db.checks.update_one({"id": cid}, {"$set": data.model_dump()})
     if not res.matched_count:
         raise HTTPException(status_code=404, detail="Çek bulunamadı")
@@ -83,7 +83,7 @@ class CheckStatusIn(BaseModel):
 
 
 @router.patch("/checks/{cid}/status")
-async def check_status(cid: str, data: CheckStatusIn, user=Depends(get_current_user)):
+async def check_status(cid: str, data: CheckStatusIn, user=Depends(require_perm("edit_checks"))):
     if data.status not in ("portfoyde", "tahsil_edildi", "odendi", "karsiliksiz", "ciro_edildi"):
         raise HTTPException(status_code=400, detail="Geçersiz durum")
     res = await db.checks.update_one({"id": cid}, {"$set": {"status": data.status}})
@@ -95,7 +95,7 @@ async def check_status(cid: str, data: CheckStatusIn, user=Depends(get_current_u
 
 
 @router.delete("/checks/{cid}")
-async def delete_check(cid: str, user=Depends(get_current_user)):
+async def delete_check(cid: str, user=Depends(require_perm("edit_checks"))):
     await db.checks.delete_one({"id": cid})
     await db.reminders.delete_many({"source_id": cid})
     return {"ok": True}
@@ -109,7 +109,7 @@ class EndorseIn(BaseModel):
 
 
 @router.post("/checks/{cid}/endorse", status_code=201)
-async def endorse_check(cid: str, data: EndorseIn, background: BackgroundTasks, user=Depends(get_current_user)):
+async def endorse_check(cid: str, data: EndorseIn, background: BackgroundTasks, user=Depends(require_perm("edit_checks"))):
     from routers.transactions import TransactionIn, create_transaction
     c = await db.checks.find_one({"id": cid}, {"_id": 0})
     if not c:

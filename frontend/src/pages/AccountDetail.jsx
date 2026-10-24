@@ -8,10 +8,11 @@ import { toast } from "sonner";
 import { FileDown, ArrowLeft } from "lucide-react";
 
 export default function AccountDetail() {
-  const { type, id } = useParams();
+  const { id } = useParams();
   const { data, isLoading } = useQuery({ queryKey: ["statement", id], queryFn: () => api.get(`/accounts/${id}/statement`).then((r) => r.data) });
   if (isLoading || !data) return <div className="h-64 animate-pulse bg-white/60 rounded-2xl" />;
   const { account: a, rows } = data;
+  const type = a.type;
   const pdf = (detailed) => openPdf(`/pdf/statement/${id}?detailed=${detailed}`, `ekstre-${a.name}.pdf`).catch((e) => toast.error(errMsg(e)));
   return (
     <div data-testid="account-detail-page">

@@ -29,7 +29,18 @@ export function PermissionsMatrix() {
         </div>
       </div>
       <p className="text-xs text-charcoal-light mb-4">Muhasebe ve şantiye şefinin neleri düzenleyebileceğini buradan belirlersiniz. Yönetici her zaman tüm yetkilere sahiptir.</p>
-      <div className="overflow-x-auto -mx-5 px-5">
+      <div className="sm:hidden space-y-4" data-testid="permissions-mobile">
+        {roleKeys.map((r) => (
+          <div key={r} className="rounded-2xl border border-gold-border p-3">
+            <p className="label-gold mb-2">{STATUS_LABELS[r] || r}</p>
+            {Object.entries(data.labels).map(([k, label]) => (
+              <label key={k} className="flex items-center justify-between gap-3 py-2 border-b border-stone-100 last:border-0 text-sm">
+                <span>{label}</span>
+                <input type="checkbox" className="w-5 h-5 accent-[rgb(var(--gold))]" checked={!!roles[r]?.[k]} onChange={(e) => setRoles({ ...roles, [r]: { ...roles[r], [k]: e.target.checked } })} data-testid={`perm-m-${r}-${k}`} />
+              </label>))}
+          </div>))}
+      </div>
+      <div className="hidden sm:block overflow-x-auto -mx-5 px-5">
         <table className="w-full text-sm min-w-[420px]">
           <thead><tr className="text-left label-gold border-b border-gold-border"><th className="py-2 pr-3">Yetki</th>{roleKeys.map((r) => <th key={r} className="py-2 px-3 text-center whitespace-nowrap">{STATUS_LABELS[r] || r}</th>)}</tr></thead>
           <tbody>

@@ -1,6 +1,6 @@
 import secrets
 from fastapi import APIRouter, Depends, HTTPException, Response
-from core import db, get_current_user, require_role, now_iso, site_summary, account_balance, get_object, logger
+from core import db, require_role, now_iso, site_summary, account_balance, get_object, logger
 
 router = APIRouter(tags=["portal"])
 

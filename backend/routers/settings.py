@@ -1,11 +1,11 @@
 import os
 import re
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 from typing import Optional
-from core import db, get_current_user, require_role, now_iso, get_object, logger
+from core import db, require_role, now_iso, get_object, logger
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 FONT_DIR = Path(__file__).parent.parent / "fonts"

@@ -159,6 +159,8 @@ async def update_transaction(tx_id: str, data: TransactionEdit, background: Back
         raise HTTPException(status_code=400, detail="Tutar sıfırdan büyük olmalı")
     if "kasa" in upd and upd["kasa"] not in ("nakit", "cek"):
         raise HTTPException(status_code=400, detail="Kasa nakit veya çek olmalı")
+    if "kasa" in upd and upd["kasa"] != t.get("kasa"):
+        raise HTTPException(status_code=400, detail="Kasa (nakit/çek) düzeltmeyle değiştirilemez; kaydı silip yeniden girin")
     for k in ("site_id", "account_id", "attachment_file_id", "check_due_date", "description"):
         if k in data.model_fields_set and getattr(data, k) in ("", None):
             upd[k] = None if k != "description" else ""
@@ -233,8 +235,11 @@ async def delete_tx(tx_id: str, user=Depends(get_current_user)):
     t = await db.transactions.find_one({"id": tx_id}, {"_id": 0})
     if not t:
         raise HTTPException(status_code=404, detail="İşlem bulunamadı")
-    if t["status"] == "onaylandi" and user["role"] != "yonetici":
-        raise HTTPException(status_code=403, detail="Onaylı işlemi sadece yönetici silebilir")
+    from core import user_permissions
+    perms = await user_permissions(user)
+    own_pending = t["status"] != "onaylandi" and t.get("created_by") == user["id"]
+    if not (perms.get("delete_transactions") or own_pending):
+        raise HTTPException(status_code=403, detail="Silme yetkiniz yok (yalnızca kendi onay bekleyen kaydınızı silebilirsiniz)")
     await db.transactions.delete_one({"id": tx_id})
     if t.get("check_id"):
         if t.get("endorsed"):

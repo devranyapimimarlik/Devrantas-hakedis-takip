@@ -10,7 +10,7 @@ import { FileUpload } from "@/components/shared/FileUpload";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { DocHeader } from "@/context/SettingsContext";
-import { ArrowLeft, FileDown, Sparkles, Loader2, Trash2, Wallet } from "lucide-react";
+import { ArrowLeft, FileDown, Sparkles, Loader2, Trash2, Wallet, Pencil } from "lucide-react";
 
 export default function ProgressDetail() {
   const { id } = useParams();
@@ -25,7 +25,7 @@ export default function ProgressDetail() {
   const ai = useMutation({ mutationFn: () => api.post(`/ai/progress-summary/${id}`), onSuccess: () => { inv(); toast.success("Özet hazır"); }, onError: (e) => toast.error(errMsg(e)) });
   const del = useMutation({ mutationFn: () => api.delete(`/progress-payments/${id}`), onSuccess: () => { inv(); nav("/hakedis"); }, onError: (e) => toast.error(errMsg(e)) });
   if (!h) return <div className="h-64 animate-pulse bg-white/60 rounded-2xl" />;
-  const canStatus = isManager || user.role === "muhasebe";
+  const canStatus = can("edit_progress");
   return (
     <div data-testid="progress-detail-page">
       <Link to="/hakedis" className="inline-flex items-center gap-1 text-sm text-charcoal-light hover:text-gold mb-4"><ArrowLeft className="w-4 h-4" /> Hakedişler</Link>
@@ -37,7 +37,7 @@ export default function ProgressDetail() {
           {canStatus && h.status === "taslak" && <GoldButton onClick={() => status.mutate("onaylandi")} data-testid="progress-approve-button">Onayla</GoldButton>}
           {canStatus && h.status === "onaylandi" && <GoldButton onClick={() => status.mutate("odendi")} data-testid="progress-paid-button">Ödendi İşaretle</GoldButton>}
           {h.status !== "taslak" && <GoldButton onClick={() => setPayOpen(true)} data-testid="progress-pay-button"><Wallet className="w-4 h-4" /> {h.type === "taseron" ? "Ödeme Yap" : "Tahsilat Al"}</GoldButton>}
-          {can("edit_progress") && h.status !== "odendi" && <GoldButton variant="outline" onClick={() => nav(`/hakedis/${h.id}/duzenle`)} data-testid="progress-edit-button"><Pencil className="w-4 h-4" /> Düzenle</GoldButton>}
+          {can("edit_progress") && (h.status !== "odendi" || isManager) && <GoldButton variant="outline" onClick={() => nav(`/hakedis/${h.id}/duzenle`)} data-testid="progress-edit-button"><Pencil className="w-4 h-4" /> Düzenle</GoldButton>}
           {isManager && <button onClick={() => window.confirm("Hakediş silinsin mi?") && del.mutate()} className="p-2 rounded-full hover:bg-red-50 text-red-700" data-testid="progress-delete-button"><Trash2 className="w-5 h-5" /></button>}
         </>} />
       <div className="gold-card p-5 md:p-8">

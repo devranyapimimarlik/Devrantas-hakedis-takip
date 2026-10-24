@@ -1,0 +1,46 @@
+{
+  "summary": "Iteration 5 tested the permission matrix, transaction edit ('Düzelt'), role enforcement, accounting semantics and hakediş edit. Backend: 12/12 pytest pass (run serially with -n 0). Covered: /auth/me permissions; GET/PUT /auth/permissions persistence and non-admin 403; admin tx edit with edit_log and edited_by_name; invalid kasa/category/amount -> 400; 404 for an unknown id; editing an endorsed (ciro) tx -> 400; muhasebe defaults (edit 200, approve/reject 403, PUT site 403); muhasebe editing an approved gider resets it to onay_bekliyor while an admin edit keeps onaylandi; revoking edit_transactions -> 403 and restoring it -> 200. Accounting checks: taşeron avans 1000 gives debit 1000 / balance -1000 / advance_outstanding 1000; an approved hakediş of 3000 gives credit 3000 / balance 2000 / we_owe 2000; admin PUT on an approved hakediş recalculates net to 4000 (we_owe 3000); a müşteri tahsilat of 500 gives credit 500 / balance -500 / customer_credit 500. Frontend: desktop 1920x800 and mobile 390x844 both checked. Found and fixed a crash: ProgressDetail.jsx used <Pencil> without importing it, which threw 'Pencil is not defined' and stopped /hakedis/{id} from rendering. After the fix everything requested works: edit-tx dialog prefilled, type chips hidden, save -> toast 'İşlem düzeltildi' and the list updates; permissions card with 16 checkboxes, where save is disabled until a change, saves with a toast, and reset + save restores the defaults; progress-edit-button -> /hakedis/{id}/duzenle 'Hakediş Düzelt #1' prefilled, save -> toast and the statement updates; taşeron and müşteri statement headers and stat labels are correct; edit-site-button is visible. All TEST_ data and the sub-user were deleted and permissions are back to the defaults (verified in Mongo).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "DELETE /api/transactions/{id}", "issue": "The 'delete_transactions' permission is not enforced. Any user can delete any PENDING tx. Approved tx can only be deleted by the yönetici, even when that permission is granted, while the frontend shows the delete button for approved tx whenever can('delete_transactions') is true. The result is an inconsistent 403."},
+      {"endpoint": "edit_checks / view_reports", "issue": "These are defined in PERMISSIONS but not enforced anywhere: no require_perm in checks.py or reports.py, and no can() gating in the frontend. Toggling them has no effect."},
+      {"endpoint": "PUT /api/progress-payments/{id} and PUT /api/transactions/{id}", "issue": "close_if_paid only promotes onaylandi -> odendi. If an edit raises the hakediş net, or lowers or un-approves a linked payment, an 'odendi' hakediş stays 'odendi' although it is now underpaid. There is no revert to onaylandi."},
+      {"endpoint": "PUT /api/progress-payments/{id}", "issue": "A non-admin (edit_progress) can change the net of an APPROVED hakediş and it stays 'onaylandi', so account balances change without re-approval. Transactions do reset approval in the same situation, so the two flows behave differently."},
+      {"endpoint": "PATCH /api/progress-payments/{id}/status", "issue": "Still uses require_role('yonetici','muhasebe') instead of the permission matrix."},
+      {"endpoint": "PUT /api/transactions/{id}", "issue": "Changing kasa nakit->cek on edit does not create a check record, and changing cek->nakit leaves the linked check/reminders in place."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "ProgressDetail", "issue": "FIXED by tester: the Pencil icon was not imported, so a ReferenceError crashed /hakedis/{id}", "selector": "[data-testid='progress-edit-button']", "priority": "HIGH"},
+      {"component": "ProgressDetail", "issue": "The edit button is hidden when status === 'odendi' even for the yönetici, although the backend allows the yönetici to edit paid hakediş", "selector": "[data-testid='progress-edit-button']", "priority": "LOW"},
+      {"component": "Edit tx dialog", "issue": "On the first open, before the ['sites'] query resolves, the site select shows 'Genel (şantiye dışı)' even though the state holds site_id. It corrects itself once the sites load. Seen once.", "selector": "[data-testid='tx-site-select']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/yonetim/kullanicilar mobile 390", "issues": ["In the permissions table the 'Şantiye Şefi' column is clipped at the right edge (min-w 420 with inner scroll). There is no scroll hint. Consider stacking per role or using narrower columns.", "In the user rows the role select overlaps or truncates the email text"]},
+      {"screen": "AccountDetail", "issues": ["Labels are derived from the URL :type rather than account.type, so a mismatched URL shows the wrong debit/credit semantics"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iteration5_permissions_edit.py", "/app/backend/tests/ui_seed_iter5.py", "/app/test_reports/pytest/pytest_iteration5.xml"],
+  "action_items": [
+    "Enforce delete_transactions in DELETE /transactions (allow approved deletes for roles granted it) and align the frontend",
+    "Enforce edit_checks (checks update/endorse) and view_reports (reports endpoints and nav), or remove them from the matrix",
+    "Make close_if_paid bidirectional (odendi -> onaylandi when paid < net) after hakediş or tx edits",
+    "Decide whether a non-admin edit of an approved hakediş should reset it to taslak or require re-approval",
+    "Show the progress edit button for the yönetici on odendi hakediş",
+    "Mobile permissions table layout"
+  ],
+  "critical_code_review_comments": [
+    "_perm_cache is in-process. This is fine with a single uvicorn worker, but with multiple workers the cache goes stale after a PUT.",
+    "set_permissions does 'from core import db' a second time inside the function, which is redundant.",
+    "The TransactionForm edit flow strips fields with a long destructure list. A whitelist of TransactionEdit keys would be safer."
+  ],
+  "updated_files": ["/app/frontend/src/pages/ProgressDetail.jsx", "/app/backend/tests/test_iteration5_permissions_edit.py", "/app/backend/tests/ui_seed_iter5.py"],
+  "success_rate": {"backend": "100% (12/12)", "frontend": "100% of requested checks after the Pencil import fix"},
+  "seed_data_creation": "Temporary TEST_ site/accounts/tx/hakediş/sub-user were created and all deleted. Mongo shows 0 TEST_ records. The permissions doc equals DEFAULT_PERMISSIONS.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: REACT_APP_BACKEND_URL=... pytest tests/test_iteration5_permissions_edit.py -n 0. For UI: python tests/ui_seed_iter5.py seed, then cleanup (cleanup also restores the default permissions). Account routes are /cari/taseron/{id} and /cari/musteri/{id}. Stat labels are uppercase via CSS, so use textContent rather than inner_text when matching. The server date is 2026-10-24."
+}

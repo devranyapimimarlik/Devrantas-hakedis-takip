@@ -90,9 +90,11 @@ async def update_progress(pid: str, data: ProgressIn, user=Depends(require_perm(
         raise HTTPException(status_code=404, detail="Hakediş bulunamadı")
     if h["status"] == "odendi" and user["role"] != "yonetici":
         raise HTTPException(status_code=400, detail="Ödenmiş hakedişi yalnızca yönetici düzenleyebilir")
-    await db.progress_payments.update_one({"id": pid}, {"$set": {**data.model_dump(exclude={"items"}), **calc(data), "edited_by": user["id"], "edited_by_name": user["name"], "edited_at": now_iso()}})
-    if h["status"] == "odendi":
-        await close_if_paid(pid)
+    new = {**data.model_dump(exclude={"items"}), **calc(data), "edited_by": user["id"], "edited_by_name": user["name"], "edited_at": now_iso()}
+    if user["role"] != "yonetici" and h["status"] == "onaylandi" and abs(float(new.get("net_amount", 0)) - float(h.get("net_amount", 0))) > 0.01:
+        new.update({"status": "taslak", "status_changed_at": now_iso(), "reapproval_note": "Tutar değişti — yeniden onay gerekli"})
+    await db.progress_payments.update_one({"id": pid}, {"$set": new})
+    await close_if_paid(pid)
     return await get_progress(pid, user)
 
 
@@ -101,7 +103,7 @@ class StatusIn(BaseModel):
 
 
 @router.patch("/{pid}/status")
-async def set_status(pid: str, data: StatusIn, user=Depends(require_role("yonetici", "muhasebe"))):
+async def set_status(pid: str, data: StatusIn, user=Depends(require_perm("edit_progress"))):
     if data.status not in ("taslak", "onaylandi", "odendi"):
         raise HTTPException(status_code=400, detail="Geçersiz durum")
     res = await db.progress_payments.update_one({"id": pid}, {"$set": {"status": data.status, "status_changed_at": now_iso()}})
@@ -170,12 +172,15 @@ async def pay_progress(pid: str, data: PayIn, background: BackgroundTasks, user=
 
 async def close_if_paid(pid: str):
     h = await db.progress_payments.find_one({"id": pid}, {"_id": 0, "net_amount": 1, "status": 1})
-    if not h or h["status"] != "onaylandi":
+    if not h or h["status"] not in ("onaylandi", "odendi"):
         return
     agg = await db.transactions.aggregate([{"$match": {"progress_payment_id": pid, "status": "onaylandi"}},
                                            {"$group": {"_id": None, "t": {"$sum": "$amount"}}}]).to_list(1)
-    if agg and agg[0]["t"] >= h["net_amount"] - 0.01:
+    paid = agg[0]["t"] if agg else 0
+    if paid >= h["net_amount"] - 0.01 and h["status"] == "onaylandi":
         await db.progress_payments.update_one({"id": pid}, {"$set": {"status": "odendi", "status_changed_at": now_iso()}})
+    elif paid < h["net_amount"] - 0.01 and h["status"] == "odendi":
+        await db.progress_payments.update_one({"id": pid}, {"$set": {"status": "onaylandi", "status_changed_at": now_iso()}})
 
 
 @router.get("/{pid}/excel")
