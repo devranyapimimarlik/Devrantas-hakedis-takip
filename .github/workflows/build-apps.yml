@@ -51,7 +51,9 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: "17" }
       - uses: android-actions/setup-android@v3
-      - name: Bağımlılıklar + Capacitor sync
+           with:
+          packages: platform-tools  
+        - name: Bağımlılıklar + Capacitor sync
         working-directory: mobile
         run: |
           yarn install --frozen-lockfile
