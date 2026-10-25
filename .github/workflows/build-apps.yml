@@ -96,7 +96,8 @@ jobs:
           echo "KEY_PASSWORD=${KEYSTORE_PASSWORD:-}" >> $GITHUB_ENV
       - name: Derle (APK)
         working-directory: mobile/android
-        run: |
+        run: |    
+          curl -fL https://raw.githubusercontent.com/gradle/gradle/v8.2.1/gradle/wrapper/gradle-wrapper.jar -o gradle/wrapper/gradle-wrapper.jar
           chmod +x gradlew
           export KEY_PASSWORD="$KEYSTORE_PASSWORD"
           ./gradlew assembleRelease --no-daemon
