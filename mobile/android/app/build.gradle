@@ -7,7 +7,7 @@ android {
         applicationId "com.devrantas.yapi"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode (System.getenv("BUILD_NUMBER") ?: "1").toInteger()
+        versionCode = (System.getenv("BUILD_NUMBER") ?: "1").toInteger()
         versionName "1.0.${System.getenv("BUILD_NUMBER") ?: "0"}"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
