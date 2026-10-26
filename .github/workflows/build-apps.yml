@@ -154,10 +154,11 @@ jobs:
         if: steps.chk.outputs.ready == 'true'
         working-directory: mobile/ios/App
         run: |
-          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -destination 'generic/platform=iOS' \
-            -archivePath "$PWD/build/App.xcarchive" archive \
-            DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGN_STYLE=Automatic \
-            -allowProvisioningUpdates -allowProvisioningDeviceRegistration \
+                    xcodebuild -workspace App.xcworkspace \
+             -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$PWD/build/App.xcarchive" \
+            archive CODE_SIGNING_ALLOWED=NO
             -authenticationKeyPath ~/private_keys/AuthKey_$ASC_KEY_ID.p8 -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID"
       - name: Dışa aktar ve TestFlight'a yükle
         if: steps.chk.outputs.ready == 'true'
