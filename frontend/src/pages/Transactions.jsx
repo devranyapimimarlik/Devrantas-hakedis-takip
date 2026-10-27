@@ -187,7 +187,7 @@ export default function Transactions() {
                   </div>
                 )}
                 {can("edit_transactions") && !t.endorsed && t.type !== "virman" && <button onClick={() => setEditTx(t)} className="p-2 rounded-full hover:bg-gold-bg text-charcoal-muted hover:text-gold" title="Düzelt" data-testid={`edit-tx-${t.id}`}><Pencil className="w-4 h-4" /></button>}
-                {(can("delete_transactions") || (t.status !== "onaylandi" && t.created_by === user?.id)) && <button onClick={() => window.confirm("Silinsin mi?") && del.mutate(t.id)} className="p-2 rounded-full hover:bg-red-50 text-charcoal-muted hover:text-red-700" data-testid={`delete-tx-${t.id}`}><Trash2 className="w-4 h-4" /></button>}
+                {(can("delete_transactions") || (t.status !== "onaylandi" && t.created_by === user?.id)) && !(t.type === "virman" && t.progress_payment_id) && <button onClick={() => window.confirm("Silinsin mi?") && del.mutate(t.id)} className="p-2 rounded-full hover:bg-red-50 text-charcoal-muted hover:text-red-700" data-testid={`delete-tx-${t.id}`}><Trash2 className="w-4 h-4" /></button>}
               </div>
             </div>
           ))}

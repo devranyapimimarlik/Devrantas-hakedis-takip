@@ -44,7 +44,10 @@ async def create_kasa(data: KasaIn, user=Depends(require_role("yonetici"))):
 
 @router.put("/{kasa_id}")
 async def rename_kasa(kasa_id: str, data: KasaIn, user=Depends(require_role("yonetici"))):
-    upd = {"name": data.name.strip(), "updated_at": now_iso()}
+    name = (data.name or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Kasa adı gerekli")
+    upd = {"name": name, "updated_at": now_iso()}
     if data.kind in ("nakit", "cek", "banka", "fon"):
         upd["kind"] = data.kind
     res = await db.kasalar.update_one({"id": kasa_id}, {"$set": upd})

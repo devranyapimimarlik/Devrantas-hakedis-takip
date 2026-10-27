@@ -110,8 +110,10 @@ async def statement(account_id: str, user=Depends(get_current_user)):
     rows = []
     # Müşteri: hakediş = borç (müşteri bize borçlanır), tahsilat = alacak. Taşeron: hakediş = alacak (taşeron alacaklanır), ödeme = avans/borç.
     async for h in db.progress_payments.find({"account_id": account_id, "status": {"$in": ["onaylandi", "odendi"]}}, {"_id": 0}):
-        rows.append({"date": h["date"], "type": "hakedis", "description": f"Hakediş No {h['number']} - {sites.get(h.get('site_id'), '')}",
-                     "debit": h["net_amount"] if is_customer else 0, "credit": 0 if is_customer else h["net_amount"], "ref_id": h["id"], "sort": 0})
+        gross = float(h["net_amount"]) + float(h.get("advance_deduction") or 0)
+        adv = f" (avans mahsubu {h['advance_deduction']:,.0f} ₺ düşüldü, kalan {h['net_amount']:,.0f} ₺)" if h.get("advance_deduction") else ""
+        rows.append({"date": h["date"], "type": "hakedis", "description": f"Hakediş No {h['number']} - {sites.get(h.get('site_id'), '')}{adv}",
+                     "debit": gross if is_customer else 0, "credit": 0 if is_customer else gross, "ref_id": h["id"], "sort": 0})
     ttype = "gelir" if is_customer else "gider"
     kasa_names = {"nakit": "Nakit", "cek": "Çek"}
     async for t in db.transactions.find({"account_id": account_id, "status": "onaylandi", "type": ttype}, {"_id": 0}):
