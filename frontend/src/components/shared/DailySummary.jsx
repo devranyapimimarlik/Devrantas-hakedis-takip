@@ -5,6 +5,7 @@ import { api, errMsg } from "@/lib/api";
 import { GoldButton } from "@/components/shared/Inputs";
 import { toast } from "sonner";
 import { MessageCircle, Send, Loader2, ChevronDown, ChevronUp, BellRing } from "lucide-react";
+import { Link } from "react-router-dom";
 
 export function DailySummaryCard({ compact = false }) {
   const { isManager } = useAuth();
@@ -29,6 +30,12 @@ export function DailySummaryCard({ compact = false }) {
         </div>
       </div>
       {open && <pre className="mt-4 text-sm whitespace-pre-wrap font-sans leading-relaxed bg-[#FDFBF7] border border-gold-border rounded-2xl p-4" data-testid="daily-summary-message">{data.message.replace(/\*/g, "")}</pre>}
+      {(data.advances || []).length > 0 && (
+        <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3" data-testid="advance-reminders">
+          <p className="text-xs font-semibold text-amber-900 mb-1">Açık avanslar ({data.advances.length})</p>
+          {data.advances.slice(0, 6).map((a) => <Link key={a.account_id} to={`/cari/${a.type}/${a.account_id}`} className="block text-xs text-amber-900 hover:underline py-0.5" data-testid={`advance-${a.account_id}`}>• {a.text}</Link>)}
+        </div>
+      )}
     </div>
   );
 }

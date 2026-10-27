@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { api, errMsg } from "@/lib/api";
 import { enqueue, isOffline, isNetworkError } from "@/lib/offline";
 import { VoiceExpense } from "@/components/shared/VoiceExpense";
+import { ReceiptScan } from "@/components/shared/ReceiptScan";
 import { fmtTL, fmtDate, today, STATUS_LABELS } from "@/lib/format";
 import { PageHeader, StatusBadge, EmptyState, Field, Money } from "@/components/shared/Bits";
 import { NInput, NSelect, NTextarea, GoldButton, Chip } from "@/components/shared/Inputs";
@@ -89,6 +90,10 @@ export function TransactionForm({ defaults = {}, onDone, editTx = null }) {
   return (
     <form onSubmit={submit} className="space-y-4 min-w-0 max-w-full overflow-x-hidden" data-testid="transaction-form">
       {!isEdit && <VoiceExpense onResult={(r) => setF((p) => ({ ...p, type: r.type || p.type, category: r.category || p.category, amount: r.amount != null ? String(r.amount) : p.amount, site_id: r.site_id || p.site_id, account_id: r.account_id || "", kasa: r.kasa || p.kasa, description: r.description || p.description }))} />}
+      {!isEdit && <ReceiptScan onResult={async (r, file) => {
+        setF((p) => ({ ...p, type: r.type || p.type, category: r.category || p.category, amount: r.amount != null ? String(r.amount) : p.amount, date: r.date || p.date, account_id: r.account_id || p.account_id, kasa: r.kasa || p.kasa || "nakit", description: r.description || [r.bank, r.reference && `Ref ${r.reference}`].filter(Boolean).join(" · ") || p.description }));
+        try { const fd = new FormData(); fd.append("file", file); const { data } = await api.post("/files/upload", fd, { headers: { "Content-Type": "multipart/form-data" } }); setF((p) => ({ ...p, attachment_file_id: data.id })); } catch { setLocalFile(file); }
+      }} />}
       <div className={`grid grid-cols-2 gap-2 ${isEdit ? "hidden" : ""}`}>
         {["gider", "gelir"].map((t) => <Chip key={t} active={f.type === t} onClick={() => setF({ ...f, type: t, category: t === "gider" ? "Malzeme" : "Hakediş Tahsilatı", account_id: "" })} className="w-full" data-testid={`tx-type-${t}`}>{t === "gider" ? "Ödeme (Gider)" : "Tahsilat (Gelir)"}</Chip>)}
       </div>
