@@ -171,7 +171,7 @@ async def progress_payments_list(pid: str, user=Depends(get_current_user)):
     h = await db.progress_payments.find_one({"id": pid}, {"_id": 0, "net_amount": 1})
     if not h:
         raise HTTPException(status_code=404, detail="Hakediş bulunamadı")
-    rows = await db.transactions.find({"progress_payment_id": pid}, {"_id": 0}).sort("date", 1).to_list(200)
+    rows = await db.transactions.find({"progress_payment_id": pid, "type": {"$in": ["gelir", "gider"]}}, {"_id": 0}).sort("date", 1).to_list(200)
     paid = sum(t["amount"] for t in rows if t["status"] == "onaylandi")
     pending = sum(t["amount"] for t in rows if t["status"] == "onay_bekliyor")
     return {"rows": rows, "paid": r2(paid), "pending": r2(pending), "remaining": r2(h["net_amount"] - paid)}
@@ -213,7 +213,7 @@ async def close_if_paid(pid: str):
     h = await db.progress_payments.find_one({"id": pid}, {"_id": 0, "net_amount": 1, "status": 1})
     if not h or h["status"] not in ("onaylandi", "odendi"):
         return
-    agg = await db.transactions.aggregate([{"$match": {"progress_payment_id": pid, "status": "onaylandi"}},
+    agg = await db.transactions.aggregate([{"$match": {"progress_payment_id": pid, "status": "onaylandi", "type": {"$in": ["gelir", "gider"]}}},
                                            {"$group": {"_id": None, "t": {"$sum": "$amount"}}}]).to_list(1)
     paid = agg[0]["t"] if agg else 0
     if paid >= h["net_amount"] - 0.01 and h["status"] == "onaylandi":
