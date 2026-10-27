@@ -23,6 +23,7 @@ class ProgressIn(BaseModel):
     vat_rate: float = 20
     apply_overhead: bool = True
     previous_deduction: float = 0
+    advance_deduction: float = 0
     retention_rate: float = 0
     notes: Optional[str] = ""
     terms: Optional[str] = ""
@@ -36,14 +37,35 @@ def calc(data: ProgressIn) -> dict:
         total = it.quantity * it.unit_price
         subtotal += total
         items.append({**it.model_dump(), "total": r2(total)})
-    overhead = subtotal * OVERHEAD_RATE if data.apply_overhead else 0
+    overhead = subtotal * OVERHEAD_RATE if (data.apply_overhead and data.type == "musteri") else 0
     retention = subtotal * data.retention_rate / 100
-    base = subtotal - overhead - retention - data.previous_deduction
+    base = subtotal - overhead - retention - data.previous_deduction - data.advance_deduction
     vat = base * data.vat_rate / 100
     net = base + vat
-    return {"items": items, "subtotal": r2(subtotal), "overhead_rate": OVERHEAD_RATE if data.apply_overhead else 0,
+    return {"items": items, "subtotal": r2(subtotal), "overhead_rate": OVERHEAD_RATE if (data.apply_overhead and data.type == "musteri") else 0,
             "overhead_amount": r2(overhead), "retention_amount": r2(retention), "base_amount": r2(base),
-            "vat_amount": r2(vat), "net_amount": r2(net)}
+            "vat_amount": r2(vat), "net_amount": r2(net), "advance_deduction": r2(data.advance_deduction)}
+
+
+async def outstanding_advance(account_id: str, exclude_pid: Optional[str] = None) -> dict:
+    """Hakedişe bağlı olmayan tahsilat/ödemeler avanstır; önceki hakedişlerde mahsup edilen kısım düşülür."""
+    acc = await db.accounts.find_one({"id": account_id}, {"_id": 0, "type": 1})
+    if not acc:
+        raise HTTPException(status_code=404, detail="Cari bulunamadı")
+    ttype = "gelir" if acc["type"] == "musteri" else "gider"
+    paid = await db.transactions.aggregate([{"$match": {"account_id": account_id, "status": "onaylandi", "type": ttype, "progress_payment_id": {"$in": [None, ""]}}},
+                                            {"$group": {"_id": None, "t": {"$sum": "$amount"}}}]).to_list(1)
+    q = {"account_id": account_id, "status": {"$ne": "iptal"}}
+    if exclude_pid: q["id"] = {"$ne": exclude_pid}
+    used = await db.progress_payments.aggregate([{"$match": q}, {"$group": {"_id": None, "t": {"$sum": {"$ifNull": ["$advance_deduction", 0]}}}}]).to_list(1)
+    total = float(paid[0]["t"]) if paid else 0.0
+    applied = float(used[0]["t"]) if used else 0.0
+    return {"account_type": acc["type"], "advance_total": r2(total), "applied": r2(applied), "outstanding": r2(max(total - applied, 0))}
+
+
+@router.get("/advance-balance")
+async def advance_balance(account_id: str, exclude_pid: Optional[str] = None, user=Depends(get_current_user)):
+    return await outstanding_advance(account_id, exclude_pid)
 
 
 async def _enrich(h: dict) -> dict:
@@ -94,6 +116,9 @@ async def update_progress(pid: str, data: ProgressIn, user=Depends(require_perm(
     if user["role"] != "yonetici" and h["status"] == "onaylandi" and abs(float(new.get("net_amount", 0)) - float(h.get("net_amount", 0))) > 0.01:
         new.update({"status": "taslak", "status_changed_at": now_iso(), "reapproval_note": "Tutar değişti — yeniden onay gerekli"})
     await db.progress_payments.update_one({"id": pid}, {"$set": new})
+    if h.get("overhead_tx_id") and h["type"] == "musteri":
+        amt = r2(float(new.get("subtotal") or 0) * OVERHEAD_RATE)
+        await db.transactions.update_one({"id": h["overhead_tx_id"]}, {"$set": {"amount": amt, "date": new.get("date") or h.get("date"), "site_id": new.get("site_id"), "account_id": new.get("account_id")}})
     await close_if_paid(pid)
     return await get_progress(pid, user)
 
@@ -106,14 +131,26 @@ class StatusIn(BaseModel):
 async def set_status(pid: str, data: StatusIn, user=Depends(require_perm("edit_progress"))):
     if data.status not in ("taslak", "onaylandi", "odendi"):
         raise HTTPException(status_code=400, detail="Geçersiz durum")
-    res = await db.progress_payments.update_one({"id": pid}, {"$set": {"status": data.status, "status_changed_at": now_iso()}})
-    if not res.matched_count:
+    h = await db.progress_payments.find_one({"id": pid}, {"_id": 0})
+    if not h:
         raise HTTPException(status_code=404, detail="Hakediş bulunamadı")
+    await db.progress_payments.update_one({"id": pid}, {"$set": {"status": data.status, "status_changed_at": now_iso()}})
+    from routers.transactions import create_overhead_virman, remove_overhead_virman
+    if data.status == "taslak":
+        await remove_overhead_virman(h)
+    elif h["type"] == "musteri":
+        await create_overhead_virman(h, user)
+    if data.status == "onaylandi":
+        await close_if_paid(pid)
     return {"ok": True}
 
 
 @router.delete("/{pid}")
 async def delete_progress(pid: str, user=Depends(require_role("yonetici"))):
+    h = await db.progress_payments.find_one({"id": pid}, {"_id": 0})
+    if h:
+        from routers.transactions import remove_overhead_virman
+        await remove_overhead_virman(h)
     await db.progress_payments.delete_one({"id": pid})
     return {"ok": True}
 
@@ -198,7 +235,8 @@ async def progress_excel(pid: str, user=Depends(get_current_user)):
     totals = [("Ara Toplam", h["subtotal"], False)]
     if h.get("overhead_amount"): totals.append((f"Genel Gider Kesintisi (%{int(h['overhead_rate'] * 100)})", -h["overhead_amount"], False))
     if h.get("retention_amount"): totals.append((f"Teminat (%{h['retention_rate']:g})", -h["retention_amount"], False))
-    if h.get("previous_deduction"): totals.append(("Önceki Kesinti / Avans", -h["previous_deduction"], False))
+    if h.get("previous_deduction"): totals.append(("Önceki Kesinti", -h["previous_deduction"], False))
+    if h.get("advance_deduction"): totals.append(("Avans Mahsubu", -h["advance_deduction"], False))
     totals += [("KDV Matrahı", h["base_amount"], False), (f"KDV %{h['vat_rate']:g}", h["vat_amount"], False), ("NET ÖDENECEK", h["net_amount"], True)]
     sections = [("ŞARTLAR", h.get("terms")), ("TEKNİK ŞARTNAME", h.get("technical_spec")), ("NOTLAR", h.get("notes")), ("YAPAY ZEKA ÖZETİ", h.get("ai_summary"))]
     from excel import refresh_company

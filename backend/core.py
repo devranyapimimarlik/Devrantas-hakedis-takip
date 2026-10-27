@@ -189,6 +189,40 @@ def get_object(path: str):
 
 # ---------- Finance helpers ----------
 SUB_CATEGORIES = ("Taşeron Hakediş Ödemesi", "Taşeron Avansı")
+OVERHEAD_KASA = "genel_gider"
+OVERHEAD_CATEGORY = "Genel Gider Payı (%6)"
+DEFAULT_KASALAR = [{"id": "nakit", "name": "Devrantaş Nakit", "kind": "nakit", "system": True, "order": 0},
+                   {"id": "cek", "name": "Devrantaş Çek", "kind": "cek", "system": True, "order": 1},
+                   {"id": OVERHEAD_KASA, "name": "Genel Gider Kasası (%6)", "kind": "fon", "system": True, "order": 2}]
+
+
+async def ensure_kasalar():
+    for k in DEFAULT_KASALAR:
+        await db.kasalar.update_one({"id": k["id"]}, {"$setOnInsert": {**k, "created_at": now_iso()}}, upsert=True)
+
+
+async def kasa_list() -> list:
+    rows = await db.kasalar.find({}, {"_id": 0}).sort([("order", 1), ("name", 1)]).to_list(100)
+    if not rows:
+        await ensure_kasalar()
+        rows = await db.kasalar.find({}, {"_id": 0}).sort([("order", 1), ("name", 1)]).to_list(100)
+    return rows
+
+
+async def kasa_balances() -> dict:
+    out = {k["id"]: {"name": k["name"], "kind": k.get("kind"), "system": k.get("system", False), "gelir": 0.0, "gider": 0.0, "virman_in": 0.0, "virman_out": 0.0} for k in await kasa_list()}
+    def slot(k):
+        return out.setdefault(k or "nakit", {"name": k or "nakit", "kind": None, "system": False, "gelir": 0.0, "gider": 0.0, "virman_in": 0.0, "virman_out": 0.0})
+    async for r in db.transactions.aggregate([{"$match": {"status": "onaylandi"}}, {"$group": {"_id": {"kasa": "$kasa", "type": "$type", "frm": "$kasa_from"}, "t": {"$sum": "$amount"}}}]):
+        k, t = r["_id"].get("kasa"), r["_id"]["type"]
+        if t == "gelir": slot(k)["gelir"] += r["t"]
+        elif t == "gider": slot(k)["gider"] += r["t"]
+        elif t == "virman":
+            slot(k)["virman_in"] += r["t"]
+            if r["_id"].get("frm"): slot(r["_id"]["frm"])["virman_out"] += r["t"]
+    for v in out.values():
+        v["balance"] = r2(v["gelir"] - v["gider"] + v["virman_in"] - v["virman_out"])
+    return out
 
 
 async def _sum(coll, match, field="amount"):
@@ -196,19 +230,31 @@ async def _sum(coll, match, field="amount"):
     return float(r[0]["t"]) if r else 0.0
 
 
+async def taseron_ids() -> list:
+    return [a["id"] async for a in db.accounts.find({"type": "taseron"}, {"_id": 0, "id": 1})]
+
+
+def direct_expense_match(sub_ids: list) -> dict:
+    # Taşerona yapılan her ödeme avanstır; şantiye giderine yalnızca onaylı taşeron hakedişi yansır
+    return {"category": {"$nin": list(SUB_CATEGORIES)}, "account_id": {"$nin": sub_ids}}
+
+
 async def site_summary(site: dict) -> dict:
     sid = site["id"]
+    sub_ids = await taseron_ids()
+    dm = direct_expense_match(sub_ids)
     income = await _sum("transactions", {"site_id": sid, "status": "onaylandi", "type": "gelir"})
-    direct_expense = await _sum("transactions", {"site_id": sid, "status": "onaylandi", "type": "gider", "category": {"$nin": list(SUB_CATEGORIES)}})
+    direct_expense = await _sum("transactions", {"site_id": sid, "status": "onaylandi", "type": "gider", **dm})
     sub_expense = await _sum("progress_payments", {"site_id": sid, "type": "taseron", "status": {"$in": ["onaylandi", "odendi"]}}, "net_amount")
-    pending_total = await _sum("transactions", {"site_id": sid, "status": "onay_bekliyor", "type": "gider", "category": {"$nin": list(SUB_CATEGORIES)}})
-    sub_paid = await _sum("transactions", {"site_id": sid, "status": "onaylandi", "type": "gider", "category": {"$in": list(SUB_CATEGORIES)}})
+    pending_total = await _sum("transactions", {"site_id": sid, "status": "onay_bekliyor", "type": "gider", **dm})
+    sub_paid = await _sum("transactions", {"site_id": sid, "status": "onaylandi", "type": "gider",
+                                           "$or": [{"category": {"$in": list(SUB_CATEGORIES)}}, {"account_id": {"$in": sub_ids}}]})
     contract = float(site.get("contract_amount") or 0)
     overhead = contract * OVERHEAD_RATE
     net_contract = contract - overhead
     expense = direct_expense + sub_expense
     est_profit = net_contract - expense
-    realized_overhead = income * OVERHEAD_RATE
+    realized_overhead = await _sum("transactions", {"site_id": sid, "status": "onaylandi", "type": "virman", "category": OVERHEAD_CATEGORY})
     realized_profit = income - realized_overhead - expense
     progress = float(site.get("progress_percent") or 0)
     budget_used = (expense / net_contract * 100) if net_contract else 0
@@ -227,7 +273,10 @@ async def site_summary(site: dict) -> dict:
 
 async def account_balance(account: dict) -> dict:
     aid = account["id"]
-    hak_total = await _sum("progress_payments", {"account_id": aid, "status": {"$in": ["onaylandi", "odendi"]}}, "net_amount")
+    # Hakediş brüt (avans mahsubu öncesi): net_amount + advance_deduction; avanslar tahsilat/ödeme olarak ayrıca sayılır
+    agg = await db.progress_payments.aggregate([{"$match": {"account_id": aid, "status": {"$in": ["onaylandi", "odendi"]}}},
+                                                {"$group": {"_id": None, "t": {"$sum": {"$add": ["$net_amount", {"$ifNull": ["$advance_deduction", 0]}]}}}}]).to_list(1)
+    hak_total = float(agg[0]["t"]) if agg else 0.0
     ttype = "gelir" if account.get("type") == "musteri" else "gider"
     pay_total = await _sum("transactions", {"account_id": aid, "status": "onaylandi", "type": ttype})
     advance = await _sum("transactions", {"account_id": aid, "status": "onaylandi", "type": ttype, "category": {"$in": ["Taşeron Avansı", "Avans"]}})

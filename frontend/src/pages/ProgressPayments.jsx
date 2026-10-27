@@ -47,22 +47,25 @@ export function NewProgress() {
   const { data: existing } = useQuery({ queryKey: ["progress", editId], queryFn: () => api.get(`/progress-payments/${editId}`).then((r) => r.data), enabled: !!editId });
   useEffect(() => {
     if (!existing) return;
-    setF((p) => ({ ...p, site_id: existing.site_id, account_id: existing.account_id, type: existing.type, date: existing.date, period: existing.period || "", vat_rate: existing.vat_rate, apply_overhead: existing.apply_overhead, previous_deduction: existing.previous_deduction || 0, retention_rate: existing.retention_rate || 0, notes: existing.notes || "", terms: existing.terms || "", technical_spec: existing.technical_spec || "" }));
+    setF((p) => ({ ...p, site_id: existing.site_id, account_id: existing.account_id, type: existing.type, date: existing.date, period: existing.period || "", vat_rate: existing.vat_rate, apply_overhead: existing.apply_overhead, previous_deduction: existing.previous_deduction || 0, advance_deduction: existing.advance_deduction || 0, retention_rate: existing.retention_rate || 0, notes: existing.notes || "", terms: existing.terms || "", technical_spec: existing.technical_spec || "" }));
     setItems(existing.items?.length ? existing.items : [{ description: "", unit: "m2", quantity: "", unit_price: "" }]);
   }, [existing]);
-  const [f, setF] = useState({ site_id: sp.get("site_id") || "", account_id: sp.get("account_id") || "", type: sp.get("type") || "taseron", date: today(), period: "", vat_rate: 20, apply_overhead: true, previous_deduction: 0, retention_rate: 0, notes: "", terms: "", technical_spec: "" });
+  const [f, setF] = useState({ site_id: sp.get("site_id") || "", account_id: sp.get("account_id") || "", type: sp.get("type") || "taseron", date: today(), period: "", vat_rate: 20, apply_overhead: true, previous_deduction: 0, advance_deduction: 0, retention_rate: 0, notes: "", terms: "", technical_spec: "" });
   const [items, setItems] = useState([{ description: "", unit: "m2", quantity: "", unit_price: "" }]);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const { data: sites = [] } = useQuery({ queryKey: ["sites"], queryFn: () => api.get("/sites").then((r) => r.data) });
   const { data: accounts = [] } = useQuery({ queryKey: ["accounts", "all"], queryFn: () => api.get("/accounts").then((r) => r.data) });
+  const { data: adv } = useQuery({ queryKey: ["advance", f.account_id, editId], queryFn: () => api.get("/progress-payments/advance-balance", { params: { account_id: f.account_id, exclude_pid: editId || undefined } }).then((r) => r.data), enabled: !!f.account_id });
+  useEffect(() => { if (adv && !existing) setF((p) => ({ ...p, advance_deduction: adv.outstanding })); }, [adv, existing]);
+  const isCust = f.type === "musteri";
   const calc = useMemo(() => {
     const sub = items.reduce((s, it) => s + Number(it.quantity || 0) * Number(it.unit_price || 0), 0);
-    const oh = f.apply_overhead ? sub * 0.06 : 0;
+    const oh = isCust && f.apply_overhead ? sub * 0.06 : 0;
     const ret = sub * Number(f.retention_rate || 0) / 100;
-    const base = sub - oh - ret - Number(f.previous_deduction || 0);
+    const base = sub - oh - ret - Number(f.previous_deduction || 0) - Number(f.advance_deduction || 0);
     const vat = base * Number(f.vat_rate || 0) / 100;
     return { sub, oh, ret, base, vat, net: base + vat };
-  }, [items, f]);
+  }, [items, f, isCust]);
   const m = useMutation({
     mutationFn: (b) => (editId ? api.put(`/progress-payments/${editId}`, b) : api.post("/progress-payments", b)),
     onSuccess: (r) => { qc.invalidateQueries({ queryKey: ["progress"] }); qc.invalidateQueries({ queryKey: ["accounts"] }); qc.invalidateQueries({ queryKey: ["sites"] }); toast.success(editId ? "Hakediş düzeltildi" : "Hakediş oluşturuldu"); nav(`/hakedis/${r.data.id}`); },
@@ -73,7 +76,7 @@ export function NewProgress() {
     if (!f.site_id || !f.account_id) return toast.error("Şantiye ve cari seçin");
     const clean = items.filter((it) => it.description).map((it) => ({ ...it, quantity: Number(it.quantity || 0), unit_price: Number(it.unit_price || 0) }));
     if (!clean.length) return toast.error("En az bir kalem girin");
-    m.mutate({ ...f, items: clean, vat_rate: Number(f.vat_rate), previous_deduction: Number(f.previous_deduction || 0), retention_rate: Number(f.retention_rate || 0) });
+    m.mutate({ ...f, items: clean, vat_rate: Number(f.vat_rate), previous_deduction: Number(f.previous_deduction || 0), advance_deduction: Number(f.advance_deduction || 0), retention_rate: Number(f.retention_rate || 0) });
   };
   return (
     <div data-testid="new-progress-page">
@@ -91,14 +94,17 @@ export function NewProgress() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <Field label="KDV %"><NInput type="number" value={f.vat_rate} onChange={set("vat_rate")} data-testid="progress-vat-input" /></Field>
           <Field label="Teminat %"><NInput type="number" value={f.retention_rate} onChange={set("retention_rate")} data-testid="progress-retention-input" /></Field>
-          <Field label="Önceki Kesinti / Avans (₺)"><NInput type="number" value={f.previous_deduction} onChange={set("previous_deduction")} data-testid="progress-deduction-input" /></Field>
-          <label className="flex items-center gap-2 text-sm pt-6"><input type="checkbox" checked={f.apply_overhead} onChange={(e) => setF({ ...f, apply_overhead: e.target.checked })} className="w-5 h-5 accent-[#B8860B]" data-testid="progress-overhead-checkbox" /> %6 Genel Gider Kes</label>
+          <Field label="Önceki Kesinti (₺)"><NInput type="number" value={f.previous_deduction} onChange={set("previous_deduction")} data-testid="progress-deduction-input" /></Field>
+          <Field label="Avans Mahsubu (₺)" hint={adv ? `Açık avans: ${fmtTL(adv.outstanding)} (toplam ${fmtTL(adv.advance_total)}, önceki hakedişlerde ${fmtTL(adv.applied)} düşüldü)` : "Cari seçince otomatik dolar"}><NInput type="number" value={f.advance_deduction} onChange={set("advance_deduction")} data-testid="progress-advance-input" /></Field>
+          {isCust && <label className="flex items-center gap-2 text-sm pt-6"><input type="checkbox" checked={f.apply_overhead} onChange={(e) => setF({ ...f, apply_overhead: e.target.checked })} className="w-5 h-5 accent-[#B8860B]" data-testid="progress-overhead-checkbox" /> %6 Genel Gider Kes</label>}
         </div>
         <div className="ml-auto max-w-sm space-y-2 text-sm" data-testid="progress-totals">
           <div className="flex justify-between"><span>Ara toplam</span><Money value={calc.sub} /></div>
-          {f.apply_overhead && <div className="flex justify-between text-gold-dark"><span>Genel gider (%6)</span><span className="money">−{fmtTL(calc.oh)}</span></div>}
+          {isCust && f.apply_overhead && <div className="flex justify-between text-gold-dark"><span>Genel gider (%6)</span><span className="money">−{fmtTL(calc.oh)}</span></div>}
+          {isCust && <p className="text-[11px] text-charcoal-muted">Onaylanınca KDV hariç tutarın %6'sı ({fmtTL(calc.sub * 0.06)}) Genel Gider Kasası'na gelir olarak aktarılır.</p>}
           {calc.ret > 0 && <div className="flex justify-between"><span>Teminat</span><span className="money">−{fmtTL(calc.ret)}</span></div>}
           {Number(f.previous_deduction) > 0 && <div className="flex justify-between"><span>Önceki kesinti</span><span className="money">−{fmtTL(f.previous_deduction)}</span></div>}
+          {Number(f.advance_deduction) > 0 && <div className="flex justify-between text-amber-700" data-testid="progress-advance-row"><span>Avans mahsubu</span><span className="money">−{fmtTL(f.advance_deduction)}</span></div>}
           <div className="flex justify-between"><span>KDV %{f.vat_rate}</span><Money value={calc.vat} /></div>
           <div className="flex justify-between border-t-2 border-gold pt-2 text-xl font-semibold text-gold"><span>Net ödenecek</span><Money value={calc.net} /></div>
         </div>

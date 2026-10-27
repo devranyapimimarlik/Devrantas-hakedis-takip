@@ -5,7 +5,8 @@ import { api, errMsg } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { fmtTL, fmtDate } from "@/lib/format";
 import { PageHeader, StatCard, StatusBadge, EmptyState, Money, OverheadTag, SectionTitle } from "@/components/shared/Bits";
-import { GoldButton } from "@/components/shared/Inputs";
+import { GoldButton, NInput } from "@/components/shared/Inputs";
+import { TxActions } from "@/components/shared/TxActions";
 import { SiteForm } from "@/pages/Sites";
 import { TransactionForm } from "@/pages/Transactions";
 import { SitePhotos } from "@/components/shared/SitePhotos";
@@ -19,6 +20,8 @@ export default function SiteDetail() {
   const qc = useQueryClient();
   const [edit, setEdit] = useState(false);
   const [addTx, setAddTx] = useState(false);
+  const [txQ, setTxQ] = useState("");
+  const [showAll, setShowAll] = useState(false);
   const { data: s } = useQuery({ queryKey: ["site", id], queryFn: () => api.get(`/sites/${id}`).then((r) => r.data) });
   const { data: txs = [] } = useQuery({ queryKey: ["transactions", "site", id], queryFn: () => api.get("/transactions", { params: { site_id: id } }).then((r) => r.data) });
   const { data: haks = [] } = useQuery({ queryKey: ["progress", "site", id], queryFn: () => api.get("/progress-payments", { params: { site_id: id } }).then((r) => r.data) });
@@ -26,6 +29,8 @@ export default function SiteDetail() {
   if (!s) return <div className="h-64 animate-pulse bg-white/60 rounded-2xl" />;
   const sm = s.summary;
   const warn = sm.deviation > 10;
+  const nq = txQ.trim().toLocaleLowerCase("tr");
+  const siteTxRows = txs.filter((t) => !nq || [t.description, t.category, t.account_name, t.created_by_name, String(t.amount), fmtTL(t.amount), t.date].some((v) => (v || "").toString().toLocaleLowerCase("tr").includes(nq)));
   return (
     <div data-testid="site-detail-page">
       <Link to="/santiyeler" className="inline-flex items-center gap-1 text-sm text-charcoal-light hover:text-gold mb-4"><ArrowLeft className="w-4 h-4" /> Şantiyeler</Link>
@@ -57,9 +62,16 @@ export default function SiteDetail() {
               <Link key={h.id} to={`/hakedis/${h.id}`} className="row-line hover:text-gold"><span>No {h.number} · {h.account_name} <StatusBadge status={h.status} className="ml-1" /></span><Money value={h.net_amount} className="font-semibold" /></Link>))}
           </div>
           <div className="gold-card p-5 md:p-6">
-            <SectionTitle>Son İşlemler</SectionTitle>
-            {txs.length === 0 ? <p className="text-sm text-charcoal-muted">İşlem yok</p> : txs.slice(0, 10).map((t) => (
-              <div key={t.id} className="row-line"><span className="min-w-0 truncate">{fmtDate(t.date)} · {t.description || t.category} <StatusBadge status={t.status} className="ml-1" /></span><Money value={t.type === "gider" ? -t.amount : t.amount} signed className="font-semibold shrink-0" /></div>))}
+            <SectionTitle right={<span className="text-xs text-charcoal-muted">{txs.length} kayıt</span>}>Şantiye Ödemeleri ve Tahsilatları</SectionTitle>
+            <NInput value={txQ} onChange={(e) => setTxQ(e.target.value)} placeholder="Ara: kişi, tutar, açıklama…" className="mb-3" data-testid="site-tx-search" />
+            <p className="text-[11px] text-charcoal-muted mb-2">Taşerona verilen avanslar burada görünür ama şantiye giderine sayılmaz (toplam {fmtTL(sm.subcontractor_paid)}); gider yalnızca onaylı taşeron hakedişinden oluşur. Kalem simgesiyle düzeltin.</p>
+            {siteTxRows.length === 0 ? <p className="text-sm text-charcoal-muted">İşlem yok</p> : siteTxRows.slice(0, showAll ? undefined : 15).map((t) => (
+              <div key={t.id} className="row-line gap-2" data-testid={`site-tx-${t.id}`}>
+                <span className="min-w-0 flex-1 truncate text-sm">{fmtDate(t.date)} · {t.description || t.category}{t.account_name ? ` · ${t.account_name}` : ""} <StatusBadge status={t.status} className="ml-1" />{t.duplicate_of?.length > 0 && <span className="ml-1 text-[10px] text-red-700 font-semibold">MÜKERRER?</span>}</span>
+                <Money value={t.type === "gider" ? -t.amount : t.amount} signed={t.type !== "virman"} className="font-semibold shrink-0" />
+                {t.type !== "virman" && <TxActions tx={t} />}
+              </div>))}
+            {siteTxRows.length > 15 && !showAll && <button onClick={() => setShowAll(true)} className="text-xs text-gold mt-2 hover:underline" data-testid="site-tx-show-all">Tümünü göster ({siteTxRows.length})</button>}
           </div>
         </div>
       </div>

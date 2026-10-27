@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { toast } from "sonner";
 import { Plus, Trash2, Check, AlertTriangle, Clock, CalendarClock, BellOff } from "lucide-react";
 import { DailySummaryCard } from "@/components/shared/DailySummary";
+import { useKasalar } from "@/lib/kasa";
 
 export function ReminderBanners({ compact = false }) {
   const qc = useQueryClient();
@@ -38,17 +39,21 @@ export function ReminderBanners({ compact = false }) {
 
 function PaymentForm({ onDone }) {
   const qc = useQueryClient();
-  const [f, setF] = useState({ type: "kira", title: "", amount: "", due_date: today(), site_id: "", notes: "" });
+  const { kasalar } = useKasalar();
+  const [f, setF] = useState({ type: "kira", title: "", amount: "", due_date: today(), site_id: "", account_id: "", kasa: "nakit", notes: "" });
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const { data: sites = [] } = useQuery({ queryKey: ["sites"], queryFn: () => api.get("/sites").then((r) => r.data) });
-  const m = useMutation({ mutationFn: (b) => api.post("/payments", b), onSuccess: () => { ["payments", "reminders"].forEach((k) => qc.invalidateQueries({ queryKey: [k] })); toast.success("Ödeme planlandı, hatırlatıcılar oluşturuldu"); onDone(); }, onError: (e) => toast.error(errMsg(e)) });
+  const { data: accounts = [] } = useQuery({ queryKey: ["accounts", "all"], queryFn: () => api.get("/accounts").then((r) => r.data) });
+  const m = useMutation({ mutationFn: (b) => api.post("/payments", b), onSuccess: () => { ["payments", "reminders", "calendar"].forEach((k) => qc.invalidateQueries({ queryKey: [k] })); toast.success("Ödeme planlandı, hatırlatıcılar oluşturuldu"); onDone(); }, onError: (e) => toast.error(errMsg(e)) });
   return (
-    <form onSubmit={(e) => { e.preventDefault(); m.mutate({ ...f, amount: Number(f.amount), site_id: f.site_id || null }); }} className="space-y-4" data-testid="payment-form">
+    <form onSubmit={(e) => { e.preventDefault(); m.mutate({ ...f, amount: Number(f.amount), site_id: f.site_id || null, account_id: f.account_id || null }); }} className="space-y-4" data-testid="payment-form">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="Tür"><NSelect value={f.type} onChange={set("type")} data-testid="payment-type-select"><option value="kira">Kira</option><option value="kredi_karti">Kredi Kartı</option><option value="kredi">Banka Kredisi</option><option value="diger">Diğer (SSK, vergi...)</option></NSelect></Field>
-        <Field label="Başlık"><NInput value={f.title} onChange={set("title")} required placeholder="ör. Ofis kirası - Haziran" data-testid="payment-title-input" /></Field>
+        <Field label="Tür"><NSelect value={f.type} onChange={(e) => setF({ ...f, type: e.target.value, kasa: e.target.value === "cek" ? "cek" : f.kasa === "cek" ? "nakit" : f.kasa })} data-testid="payment-type-select"><option value="kira">Kira</option><option value="kredi_karti">Kredi Kartı</option><option value="kredi">Banka Kredisi</option><option value="cek">Çek (verilecek çek vadesi)</option><option value="diger">Diğer (SSK, vergi...)</option></NSelect></Field>
+        <Field label="Başlık"><NInput value={f.title} onChange={set("title")} required placeholder={f.type === "cek" ? "ör. Ferdi Kızıltaş çeki - Kasım" : "ör. Ofis kirası - Haziran"} data-testid="payment-title-input" /></Field>
         <Field label="Tutar (₺)"><NInput type="number" step="0.01" value={f.amount} onChange={set("amount")} required data-testid="payment-amount-input" /></Field>
         <Field label="Vade Tarihi"><NInput type="date" value={f.due_date} onChange={set("due_date")} required data-testid="payment-due-input" /></Field>
+        <Field label="Ödenecek Kasa" hint={f.type === "cek" ? "Ödendi deyince çek kaydı ve çek kasası hareketi oluşur" : "Ödendi deyince bu kasadan gider yazılır"}><NSelect value={f.kasa} onChange={set("kasa")} data-testid="payment-kasa-select">{(kasalar.length ? kasalar : [{ id: "nakit", name: "Devrantaş Nakit" }, { id: "cek", name: "Devrantaş Çek" }]).map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}</NSelect></Field>
+        <Field label="Cari (isteğe bağlı)"><NSelect value={f.account_id} onChange={set("account_id")} data-testid="payment-account-select"><option value="">Yok</option>{accounts.filter((a) => a.is_active !== false).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</NSelect></Field>
         <Field label="Şantiye (isteğe bağlı)" className="sm:col-span-2"><NSelect value={f.site_id} onChange={set("site_id")}><option value="">Genel</option>{sites.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</NSelect></Field>
       </div>
       <Field label="Not"><NTextarea value={f.notes} onChange={set("notes")} /></Field>
@@ -62,7 +67,7 @@ export default function Payments() {
   const [open, setOpen] = useState(false);
   const { data = [] } = useQuery({ queryKey: ["payments"], queryFn: () => api.get("/payments").then((r) => r.data) });
   const inv = () => ["payments", "reminders"].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
-  const pay = useMutation({ mutationFn: (id) => api.patch(`/payments/${id}/paid`), onSuccess: () => { inv(); toast.success("Ödendi olarak işaretlendi"); } });
+  const pay = useMutation({ mutationFn: (p) => api.patch(`/payments/${p.id}/paid`, { kasa: p.kasa || (p.type === "cek" ? "cek" : "nakit"), date: today() }), onSuccess: (r) => { inv(); ["transactions", "dashboard", "checks", "kasalar"].forEach((k) => qc.invalidateQueries({ queryKey: [k] })); toast.success(r.data?.transaction_id ? "Ödendi — kasadan gider kaydı oluşturuldu (yönetici onayına düşer)" : "Ödendi olarak işaretlendi"); }, onError: (e) => toast.error(errMsg(e)) });
   const del = useMutation({ mutationFn: (id) => api.delete(`/payments/${id}`), onSuccess: () => { inv(); toast.success("Silindi"); } });
   const pending = data.filter((p) => p.status === "bekliyor");
   const paid = data.filter((p) => p.status === "odendi");
@@ -78,7 +83,7 @@ export default function Payments() {
             <div key={p.id} className={`gold-card p-4 flex items-center gap-3 ${p.days_left <= 0 ? "border-red-300" : p.days_left <= 3 ? "border-amber-300" : p.days_left <= 7 ? "border-gold" : ""}`} data-testid={`payment-row-${p.id}`}>
               <div className="flex-1 min-w-0"><p className="font-semibold truncate">{p.title}</p><p className="text-xs text-charcoal-light">{STATUS_LABELS[p.type]} · Vade {fmtDate(p.due_date)} · <span className={p.days_left <= 3 ? "text-red-700 font-semibold" : ""}>{p.days_left < 0 ? `${-p.days_left} gün gecikti` : p.days_left === 0 ? "BUGÜN" : `${p.days_left} gün kaldı`}</span></p></div>
               <Money value={p.amount} className="font-semibold text-lg" />
-              <button onClick={() => pay.mutate(p.id)} className="h-9 px-3 rounded-full bg-emerald-600 text-white text-xs font-semibold inline-flex items-center gap-1" data-testid={`pay-payment-${p.id}`}><Check className="w-3.5 h-3.5" /> Ödendi</button>
+              <button onClick={() => window.confirm(`"${p.title}" ${fmtTL(p.amount)} ödendi olarak işaretlensin ve ${p.type === "cek" ? "çek kasasından" : "kasadan"} gider yazılsın mı?`) && pay.mutate(p)} className="h-9 px-3 rounded-full bg-emerald-600 text-white text-xs font-semibold inline-flex items-center gap-1" data-testid={`pay-payment-${p.id}`}><Check className="w-3.5 h-3.5" /> Ödendi</button>
               <button onClick={() => del.mutate(p.id)} className="p-2 rounded-full hover:bg-red-50 text-charcoal-muted hover:text-red-700" data-testid={`delete-payment-${p.id}`}><Trash2 className="w-4 h-4" /></button>
             </div>
           ))}

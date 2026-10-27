@@ -132,5 +132,6 @@ async def manifest():
     icons = [{"src": f"/api/settings/logo?size={sz}&v={ver}", "sizes": f"{sz}x{sz}", "type": "image/png", "purpose": "any maskable"} for sz in (192, 512)]
     data = {"id": "/", "name": f"{s['short_name']} {s.get('tagline') or ''}".strip(), "short_name": s["short_name"], "description": f"{s['company_name']} şantiye finans ve hakediş takibi",
             "start_url": "/", "scope": "/", "display": "standalone", "orientation": "portrait", "background_color": "#FDFBF7", "theme_color": s["primary_color"], "lang": "tr", "icons": icons,
+            "share_target": {"action": "/islemler", "method": "GET", "params": {"title": "title", "text": "text", "url": "url"}},
             "shortcuts": [{"name": "Gelir-Gider", "url": "/islemler", "icons": icons[:1]}, {"name": "Hakedişler", "url": "/hakedis", "icons": icons[:1]}, {"name": "Çekler", "url": "/cekler", "icons": icons[:1]}]}
     return JSONResponse(data, media_type="application/manifest+json")
