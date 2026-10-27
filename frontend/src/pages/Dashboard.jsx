@@ -19,6 +19,21 @@ export default function Dashboard() {
       <PageHeader eyebrow="Genel Bakış" title="Finansal Durum" subtitle={`${data.active_sites} aktif şantiye · Toplam ${data.site_count} proje · Bugün ${fmtDate(data.today)}`} />
       <ReminderBanners compact />
       <DailySummaryCard compact />
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6" data-testid="quick-summary">
+        {[
+          ["Kasa Toplamı", fmtTL(data.kasa.toplam), `${(data.kasa.list || []).length} kasa`, "/kasalar", Wallet, "text-charcoal", "quick-kasa"],
+          ["Onaylı Gider", fmtTL(data.summary?.approved_expense_all || 0), "tüm onaylı ödemeler", "/islemler?tab=gider", TrendingDown, "text-red-700", "quick-approved"],
+          ["Onay Bekleyen Gider", fmtTL(data.summary?.pending_expense.total || 0), `${data.summary?.pending_expense.count || 0} kayıt`, "/islemler?tab=bekleyen", ClipboardCheck, "text-amber-700", "quick-pending"],
+          ["Hakediş Onayı", fmtTL(data.summary?.pending_progress.total || 0), `${data.summary?.pending_progress.count || 0} taslak hakediş`, "/hakedis", Percent, "text-sky-700", "quick-progress"],
+          ["Planlı Ödemeler", fmtTL(data.summary?.planned_payments.total || 0), `${data.summary?.planned_payments.count || 0} bekleyen`, "/odeme-takvimi", Banknote, "text-gold-dark", "quick-planned"],
+        ].map(([label, val, sub, to, Icon, tone, tid]) => (
+          <Link key={tid} to={to} className="soft-card p-3.5 hover:bg-gold-bg/40 transition-colors min-w-0" data-testid={tid}>
+            <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-charcoal-muted"><Icon className="w-3.5 h-3.5 text-gold" />{label}</div>
+            <p className={`money text-lg font-semibold mt-1 truncate ${tone}`}>{val}</p>
+            <p className="text-[11px] text-charcoal-light truncate">{sub}</p>
+          </Link>))}
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
         <StatCard label="Toplam Sözleşme" value={fmtTL(t.contract)} hint={`Tahmini %6 genel gider: ${fmtTL(t.overhead)}`} icon={Wallet} testId="stat-contract" />
         <StatCard label="Toplam Tahsilat" value={fmtTL(t.income)} hint={`%6 genel gider kasasına aktarılan: ${fmtTL(t.realized_overhead)}`} tone="green" icon={TrendingUp} testId="stat-income" delay={60} />

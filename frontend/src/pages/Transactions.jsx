@@ -28,11 +28,16 @@ export function TransactionForm({ defaults = {}, onDone, editTx = null }) {
   const isSub = f.category.startsWith("Taşeron");
   const isIncome = f.type === "gelir";
   const accType = isIncome ? "musteri" : isSub ? "taseron" : null;
-  const accOptions = accounts.filter((a) => (!accType || a.type === accType) && (a.is_active !== false || a.id === f.account_id));
+  const selectedAcc = accounts.find((a) => a.id === f.account_id);
+  const siteAssigned = f.site_id ? accounts.filter((a) => (a.site_ids || []).includes(f.site_id)) : [];
+  const accPool = f.site_id && siteAssigned.some((a) => !accType || a.type === accType) ? siteAssigned : accounts;
+  const accOptions = accPool.filter((a) => (!accType || a.type === accType) && (a.is_active !== false || a.id === f.account_id));
+  const siteOptions = selectedAcc?.site_ids?.length ? sites.filter((s) => selectedAcc.site_ids.includes(s.id) || s.id === f.site_id) : sites;
   const SITE_GROUPS = [["devam", "Devam eden"], ["planlama", "Planlanan"], ["durduruldu", "Durdurulan"], ["tamamlandi", "Tamamlanan"]];
   const pickAccount = (e) => {
     const id = e.target.value, acc = accounts.find((a) => a.id === id);
     if (!isIncome && acc?.type === "taseron" && !isSub) { setF({ ...f, account_id: id, category: "Taşeron Avansı" }); toast.info("Taşerona ödeme avans olarak kaydedilir; şantiye giderine yansımaz, hakedişten düşülür"); }
+    else if (isIncome && acc) { const open = (acc.balance || 0) > 0; setF({ ...f, account_id: id, category: open ? "Hakediş Tahsilatı" : "Avans" }); if (!open) toast.info("Bu müşterinin açık hakediş borcu yok; tahsilat AVANS olarak kaydedilir ve sonraki hakedişten düşülür"); }
     else setF({ ...f, account_id: id });
   };
   const withKeys = (list) => list.map((b) => ({ ...b, client_key: b.client_key || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}` }));
@@ -89,11 +94,11 @@ export function TransactionForm({ defaults = {}, onDone, editTx = null }) {
       </div>
       {!isIncome && <p className="text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-3 py-2 flex items-center gap-2"><ShieldAlert className="w-4 h-4 shrink-0" /> Ödemeler yönetici onayı olmadan şantiye bakiyesine yansımaz.</p>}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="Hangi Şantiye"><NSelect value={f.site_id} onChange={set("site_id")} data-testid="tx-site-select"><option value="">Genel (şantiye dışı)</option>
-          {SITE_GROUPS.map(([st, label]) => { const g = sites.filter((s) => (s.status || "devam") === st); return g.length ? <optgroup key={st} label={label}>{g.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</optgroup> : null; })}</NSelect></Field>
-        {!isIncome && <Field label="Ödeme Türü" hint={isSub ? "Taşeron avansı/ödemesi şantiye giderine yansımaz; hakediş onaylanınca gider yazılır, avans hakedişten düşülür." : undefined}><NSelect value={f.category} onChange={(e) => setF({ ...f, category: e.target.value, account_id: "" })} data-testid="tx-category-select">{(cats?.gider || []).map((c) => <option key={c}>{c}</option>)}</NSelect></Field>}
-        {isIncome && <Field label="Tahsilat Türü"><NSelect value={f.category} onChange={set("category")} data-testid="tx-category-select">{(cats?.gelir || []).map((c) => <option key={c}>{c}</option>)}</NSelect></Field>}
-        <Field label={isIncome ? "Hangi Müşteri" : isSub ? "Hangi Taşeron" : "Cari / Tedarikçi (isteğe bağlı)"} hint={accType ? "Yalnızca aktif cariler listelenir" : undefined}>
+        <Field label="Hangi Şantiye" hint={selectedAcc?.site_ids?.length ? `${selectedAcc.name} için atanmış şantiyeler listelendi` : undefined}><NSelect value={f.site_id} onChange={set("site_id")} data-testid="tx-site-select"><option value="">Genel (şantiye dışı)</option>
+          {SITE_GROUPS.map(([st, label]) => { const g = siteOptions.filter((s) => (s.status || "devam") === st); return g.length ? <optgroup key={st} label={label}>{g.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</optgroup> : null; })}</NSelect></Field>
+        {!isIncome && <Field label="Ödeme Türü" hint={isSub ? "Taşeron avansı/ödemesi şantiye giderine yansımaz; hakediş onaylanınca gider yazılır, avans hakedişten düşülür." : "Malzeme, işçilik, nakliye vb. doğrudan şantiye giderine yazılır."}><NSelect value={f.category} onChange={(e) => setF({ ...f, category: e.target.value, account_id: "" })} data-testid="tx-category-select">{(cats?.gider || []).map((c) => <option key={c}>{c}</option>)}</NSelect></Field>}
+        {isIncome && <Field label="Tahsilat Türü" hint="Açık hakediş yoksa tahsilat avans sayılır ve sonraki hakedişten düşülür"><NSelect value={f.category} onChange={set("category")} data-testid="tx-category-select">{(cats?.gelir || []).map((c) => <option key={c}>{c}</option>)}</NSelect></Field>}
+        <Field label={isIncome ? "Hangi Müşteri" : isSub ? "Hangi Taşeron" : "Cari / Tedarikçi (isteğe bağlı)"} hint={f.site_id && accPool !== accounts ? "Yalnızca bu şantiyeye atanmış cariler listelendi" : accType ? "Yalnızca aktif cariler listelenir" : undefined}>
           <NSelect value={f.account_id} onChange={pickAccount} data-testid="tx-account-select"><option value="">{accType ? "Seçin" : "Yok"}</option>{accOptions.map((a) => <option key={a.id} value={a.id}>{a.name}{!accType ? ` (${STATUS_LABELS[a.type]})` : ""}{a.is_active === false ? " (pasif)" : ""}</option>)}</NSelect>
         </Field>
         <Field label="Kasa (zorunlu)">
@@ -132,7 +137,9 @@ export default function Transactions() {
   const [waOpen, setWaOpen] = useState(!!sp.get("text"));
   const [waDefaults, setWaDefaults] = useState(null);
   const tab = sp.get("tab") || (sp.get("status") === "onay_bekliyor" ? "bekleyen" : "tumu");
-  const [open, setOpen] = useState(false);
+  const yeni = sp.get("yeni");
+  const [open, setOpen] = useState(!!yeni);
+  const yeniDefaults = yeni ? { type: yeni === "gelir" ? "gelir" : "gider", category: yeni === "gelir" ? "Hakediş Tahsilatı" : "Malzeme", account_id: sp.get("account_id") || "", site_id: sp.get("site_id") || "" } : {};
   const { data = [], isLoading } = useQuery({ queryKey: ["transactions"], queryFn: () => api.get("/transactions").then((r) => r.data) });
   const inv = () => ["transactions", "dashboard", "sites", "pending-count", "accounts", "site"].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
   const approve = useMutation({ mutationFn: (id) => api.post(`/transactions/${id}/approve`), onSuccess: () => { inv(); toast.success("Gider onaylandı"); }, onError: (e) => toast.error(errMsg(e)) });
@@ -193,8 +200,8 @@ export default function Transactions() {
           ))}
         </div>
       )}
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-xl w-[calc(100vw-1rem)] sm:w-full max-h-[90vh] overflow-y-auto overflow-x-hidden"><DialogHeader><DialogTitle className="font-serif text-2xl">Yeni Gelir / Gider</DialogTitle></DialogHeader><TransactionForm onDone={() => setOpen(false)} /></DialogContent>
+      <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o && yeni) setSp({}); }}>
+        <DialogContent className="max-w-xl w-[calc(100vw-1rem)] sm:w-full max-h-[90vh] overflow-y-auto overflow-x-hidden"><DialogHeader><DialogTitle className="font-serif text-2xl">Yeni Gelir / Gider</DialogTitle></DialogHeader><TransactionForm defaults={yeniDefaults} onDone={() => { setOpen(false); if (yeni) setSp({}); }} /></DialogContent>
       </Dialog>
       <Dialog open={waOpen} onOpenChange={(o) => { setWaOpen(o); if (!o && sp.get("text")) setSp({}); }}>
         <DialogContent className="max-w-xl w-[calc(100vw-1rem)] sm:w-full max-h-[90vh] overflow-y-auto overflow-x-hidden" data-testid="whatsapp-dialog"><DialogHeader><DialogTitle className="font-serif text-2xl">WhatsApp'tan Kayıt Al</DialogTitle></DialogHeader>

@@ -38,7 +38,8 @@ export default function ProgressDetail() {
           <GoldButton variant="outline" onClick={() => ai.mutate()} disabled={ai.isPending} data-testid="progress-ai-button">{ai.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />} AI Özet</GoldButton>
           {canStatus && h.status === "taslak" && <GoldButton onClick={() => status.mutate("onaylandi")} data-testid="progress-approve-button">Onayla</GoldButton>}
           {canStatus && h.status === "onaylandi" && <GoldButton onClick={() => status.mutate("odendi")} data-testid="progress-paid-button">Ödendi İşaretle</GoldButton>}
-          {h.status !== "taslak" && <GoldButton onClick={() => setPayOpen(true)} data-testid="progress-pay-button"><Wallet className="w-4 h-4" /> {h.type === "taseron" ? "Ödeme Yap" : "Tahsilat Al"}</GoldButton>}
+          {h.status !== "taslak" && h.type === "taseron" && <GoldButton onClick={() => setPayOpen(true)} data-testid="progress-pay-button"><Wallet className="w-4 h-4" /> Ödeme Yap</GoldButton>}
+          {h.type === "musteri" && <Link to={`/islemler?yeni=gelir&account_id=${h.account_id || ""}&site_id=${h.site_id || ""}`} className="inline-flex items-center gap-2 rounded-full border border-gold text-gold-dark px-5 py-2.5 text-sm font-medium hover:bg-gold-bg transition-colors" data-testid="progress-customer-collect-link"><Wallet className="w-4 h-4" /> Tahsilat Gir (İşlemler)</Link>}
           {can("edit_progress") && (h.status !== "odendi" || isManager) && <GoldButton variant="outline" onClick={() => nav(`/hakedis/${h.id}/duzenle`)} data-testid="progress-edit-button"><Pencil className="w-4 h-4" /> Düzenle</GoldButton>}
           {isManager && <button onClick={() => window.confirm("Hakediş silinsin mi?") && del.mutate()} className="p-2 rounded-full hover:bg-red-50 text-red-700" data-testid="progress-delete-button"><Trash2 className="w-5 h-5" /></button>}
         </>} />
@@ -74,8 +75,9 @@ export default function ProgressDetail() {
           </div>
           <div className="h-2 rounded-full bg-stone-100 mb-4"><div className="h-full rounded-full bg-emerald-600" style={{ width: `${Math.min(100, (pays.paid / (h.net_amount || 1)) * 100)}%` }} /></div>
           <p className="text-xs text-charcoal-light mb-3 bg-gold-bg/60 border border-gold-border rounded-xl px-3 py-2" data-testid="progress-collect-summary">
-            Hakediş {fmtTL(h.net_amount + (h.advance_deduction || 0))}{h.advance_deduction > 0 ? ` − avans mahsubu ${fmtTL(h.advance_deduction)}` : ""} = <b>{fmtTL(h.net_amount)}</b> {h.type === "taseron" ? "ödenecek" : "tahsil edilecek"}; şimdiye kadar {fmtTL(pays.paid)} {h.type === "taseron" ? "ödendi" : "alındı"}, <b>kalan {fmtTL(pays.remaining)}</b>.
-            {h.type === "musteri" && h.overhead_tx_id ? ` %6 genel gider payı (${fmtTL((h.subtotal || 0) * 0.06)}) Genel Gider Kasası'na aktarıldı.` : ""}
+            {h.type === "taseron"
+              ? <>Hakediş {fmtTL(h.net_amount + (h.advance_deduction || 0))}{h.advance_deduction > 0 ? ` − avans mahsubu ${fmtTL(h.advance_deduction)}` : ""} = <b>{fmtTL(h.net_amount)}</b> ödenecek; şimdiye kadar {fmtTL(pays.paid)} ödendi, <b>kalan {fmtTL(pays.remaining)}</b>.</>
+              : <>Hakediş brüt {fmtTL(h.net_amount + (h.advance_deduction || 0))}{h.advance_deduction > 0 ? ` − müşteriden önceden alınan avans ${fmtTL(h.advance_deduction)}` : ""} = <b>{fmtTL(h.net_amount)}</b> müşteri alacağı. Müşteriden alınan her ödeme İşlemler'den tahsilat olarak girilir ve cari bakiyeden otomatik düşer; hakediş üzerinden ayrıca tahsilat alınmaz (çift sayım olmaz).{h.overhead_tx_id ? ` %6 genel gider payı (${fmtTL((h.subtotal || 0) * 0.06)}) Genel Gider Kasası'na aktarıldı.` : ""}</>}
           </p>
           {pays.rows.length === 0 ? <p className="text-sm text-charcoal-muted">Henüz ödeme yok</p> : pays.rows.map((t) => (
             <div key={t.id} className="row-line" data-testid={`progress-pay-row-${t.id}`}><span>{fmtDate(t.date)} · {kasaName(t.kasa)} · {t.description} <StatusBadge status={t.status} className="ml-1" /></span><Money value={t.amount} className="font-semibold" /></div>))}

@@ -139,6 +139,12 @@ async def create_transaction(data: TransactionIn, background: BackgroundTasks, u
         acc = await db.accounts.find_one({"id": data.account_id}, {"_id": 0, "type": 1})
         if acc and acc.get("type") == "taseron":
             data.category = "Taşeron Avansı"
+    if data.type == "gelir" and data.account_id and data.category in ("Hakediş Tahsilatı", "Avans"):
+        acc = await db.accounts.find_one({"id": data.account_id}, {"_id": 0})
+        if acc and acc.get("type") == "musteri":
+            from core import account_balance
+            bal = (await account_balance(acc))["balance"]
+            data.category = "Hakediş Tahsilatı" if bal > 0 else "Avans"
     if data.client_key:
         existing = await db.transactions.find_one({"client_key": data.client_key, "created_by": user["id"]}, {"_id": 0})
         if existing:

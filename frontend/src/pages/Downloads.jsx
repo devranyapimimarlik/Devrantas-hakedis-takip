@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Monitor, Smartphone, Apple, Download, ExternalLink, Github, KeyRound, ListChecks, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { api, errMsg } from "@/lib/api";
@@ -39,16 +39,40 @@ function PlatformCard({ icon: Icon, title, desc, href, cta, steps, testId, disab
   );
 }
 
+function BuildStatus({ repo }) {
+  const { data: st, isFetching, refetch } = useQuery({ queryKey: ["dist-status", repo], queryFn: () => api.get("/settings/distribution/status").then((r) => r.data), enabled: !!repo, refetchInterval: 60_000 });
+  if (!repo) return null;
+  const ok = (b) => b ? "text-emerald-700" : "text-red-700";
+  return (
+    <div className="soft-card p-4 mt-3" data-testid="build-status">
+      <div className="flex items-center justify-between mb-2"><p className="text-sm font-semibold">Derleme durumu — {repo}</p><button type="button" onClick={() => refetch()} className="text-xs text-gold" data-testid="build-status-refresh">{isFetching ? "Kontrol ediliyor…" : "Yenile"}</button></div>
+      {st && (
+        <div className="text-xs space-y-1">
+          <p className={ok(st.repo_ok)}>{st.repo_ok ? "✓" : "✗"} GitHub deposu {st.repo_ok ? (st.private ? "bulundu (özel)" : "bulundu") : "bulunamadı"}</p>
+          <p className={ok(st.workflow_ok)}>{st.workflow_ok ? "✓" : "✗"} Derleme dosyası (.github/workflows/build-apps.yml) {st.workflow_ok ? "depoda" : "depoda yok"}</p>
+          <p className={ok(st.runs?.length)}>{st.runs?.length ? "✓" : "✗"} Son derleme: {st.runs?.[0] ? `${st.runs[0].status}${st.runs[0].conclusion ? " / " + st.runs[0].conclusion : ""} · ` : "yok "}{st.runs?.[0] && <a className="underline" href={st.runs[0].url} target="_blank" rel="noreferrer">günlüğü aç</a>}</p>
+          <p className={ok(st.release_ok)}>{st.release_ok ? "✓" : "✗"} Yayınlanan dosyalar: {st.assets?.length ? st.assets.map((a) => a.name).join(", ") : "henüz yok"}</p>
+          {st.error && <p className="text-red-700" data-testid="build-status-error">{st.error}</p>}
+          {st.steps?.length > 0 && <div className="mt-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-amber-900" data-testid="build-status-steps"><p className="font-semibold mb-1">Yapılacak:</p><ul className="list-disc pl-4 space-y-0.5">{st.steps.map((s) => <li key={s}>{s}</li>)}</ul></div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DistributionForm({ settings, refresh }) {
   const [f, setF] = useState({ github_repo: "", testflight_url: "" });
   useEffect(() => { if (settings) setF({ github_repo: settings.github_repo || "", testflight_url: settings.testflight_url || "" }); }, [settings]);
   const save = useMutation({ mutationFn: () => api.put("/settings/distribution", f), onSuccess: async () => { await refresh(); toast.success("İndirme bağlantıları güncellendi"); }, onError: (e) => toast.error(errMsg(e)) });
   return (
+    <div>
     <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }} className="soft-card p-5 grid sm:grid-cols-[1fr_1fr_auto] gap-3 items-end" data-testid="distribution-form">
-      <Field label="GitHub deposu (kullanici/depo)" hint="Save to GitHub sonrası depo adı; indirme linkleri buradan üretilir"><NInput value={f.github_repo} onChange={(e) => setF({ ...f, github_repo: e.target.value })} placeholder="devrantas/hakedis-takip" data-testid="distribution-repo-input" /></Field>
+      <Field label="GitHub depo adresi" hint="Depo sayfasının adresini olduğu gibi yapıştırın; 'kullanici/depo' otomatik ayıklanır"><NInput value={f.github_repo} onChange={(e) => setF({ ...f, github_repo: e.target.value })} placeholder="https://github.com/kullanici/depo" data-testid="distribution-repo-input" /></Field>
       <Field label="TestFlight davet bağlantısı" hint="App Store Connect → TestFlight → Public Link"><NInput value={f.testflight_url} onChange={(e) => setF({ ...f, testflight_url: e.target.value })} placeholder="https://testflight.apple.com/join/..." data-testid="distribution-testflight-input" /></Field>
       <GoldButton type="submit" disabled={save.isPending} data-testid="distribution-save-button">Kaydet</GoldButton>
     </form>
+    <BuildStatus repo={settings?.github_repo} />
+    </div>
   );
 }
 

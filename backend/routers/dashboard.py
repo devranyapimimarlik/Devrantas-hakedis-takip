@@ -17,6 +17,14 @@ async def dashboard(user=Depends(get_current_user)):
         agg["pending"] += sm["pending_expense"]; agg["profit"] += sm["estimated_profit"]
         agg["realized_profit"] += sm["realized_profit"]; agg["realized_overhead"] += sm["realized_overhead"]
     pending_count = await db.transactions.count_documents({"status": "onay_bekliyor"})
+    pend_agg = await db.transactions.aggregate([{"$match": {"status": "onay_bekliyor", "type": "gider"}}, {"$group": {"_id": None, "t": {"$sum": "$amount"}, "c": {"$sum": 1}}}]).to_list(1)
+    prog_agg = await db.progress_payments.aggregate([{"$match": {"status": "taslak"}}, {"$group": {"_id": None, "t": {"$sum": "$net_amount"}, "c": {"$sum": 1}}}]).to_list(1)
+    plan_agg = await db.payments.aggregate([{"$match": {"status": "bekliyor"}}, {"$group": {"_id": None, "t": {"$sum": "$amount"}, "c": {"$sum": 1}}}]).to_list(1)
+    approved_expense = await db.transactions.aggregate([{"$match": {"status": "onaylandi", "type": "gider"}}, {"$group": {"_id": None, "t": {"$sum": "$amount"}}}]).to_list(1)
+    summary = {"pending_expense": {"total": r2(pend_agg[0]["t"]) if pend_agg else 0, "count": pend_agg[0]["c"] if pend_agg else 0},
+               "pending_progress": {"total": r2(prog_agg[0]["t"]) if prog_agg else 0, "count": prog_agg[0]["c"] if prog_agg else 0},
+               "planned_payments": {"total": r2(plan_agg[0]["t"]) if plan_agg else 0, "count": plan_agg[0]["c"] if plan_agg else 0},
+               "approved_expense_all": r2(approved_expense[0]["t"]) if approved_expense else 0}
     monthly = {}
     async for t in db.transactions.find({"status": "onaylandi", "type": {"$in": ["gelir", "gider"]}}, {"_id": 0, "date": 1, "type": 1, "amount": 1}):
         m = (t.get("date") or "")[:7]
@@ -41,7 +49,7 @@ async def dashboard(user=Depends(get_current_user)):
     return {
         "totals": {k: r2(v) for k, v in agg.items()},
         "profit_margin": r2(agg["profit"] / agg["contract"] * 100) if agg["contract"] else 0,
-        "pending_approvals": pending_count,
+        "pending_approvals": pending_count, "summary": summary,
         "site_count": len(sites), "active_sites": sum(1 for s in sites if s.get("status") == "devam"),
         "sites": site_rows, "cashflow": cashflow,
         "checks_in": {"total": r2(checks_in[0]["t"]) if checks_in else 0, "count": checks_in[0]["c"] if checks_in else 0},

@@ -48,16 +48,16 @@ def calc(data: ProgressIn) -> dict:
 
 
 async def outstanding_advance(account_id: str, exclude_pid: Optional[str] = None) -> dict:
-    """Hakedişe bağlı olmayan tahsilat/ödemeler avanstır; önceki hakedişlerde mahsup edilen kısım düşülür."""
+    """Açık avans = carinin toplam ödemesi/tahsilatı − diğer onaylı hakedişlerin brüt tutarı (fazla ödenen kısım)."""
     acc = await db.accounts.find_one({"id": account_id}, {"_id": 0, "type": 1})
     if not acc:
         raise HTTPException(status_code=404, detail="Cari bulunamadı")
     ttype = "gelir" if acc["type"] == "musteri" else "gider"
-    paid = await db.transactions.aggregate([{"$match": {"account_id": account_id, "status": "onaylandi", "type": ttype, "progress_payment_id": {"$in": [None, ""]}}},
+    paid = await db.transactions.aggregate([{"$match": {"account_id": account_id, "status": "onaylandi", "type": ttype}},
                                             {"$group": {"_id": None, "t": {"$sum": "$amount"}}}]).to_list(1)
-    q = {"account_id": account_id, "status": {"$ne": "iptal"}}
+    q = {"account_id": account_id, "status": {"$in": ["onaylandi", "odendi"]}}
     if exclude_pid: q["id"] = {"$ne": exclude_pid}
-    used = await db.progress_payments.aggregate([{"$match": q}, {"$group": {"_id": None, "t": {"$sum": {"$ifNull": ["$advance_deduction", 0]}}}}]).to_list(1)
+    used = await db.progress_payments.aggregate([{"$match": q}, {"$group": {"_id": None, "t": {"$sum": {"$add": ["$net_amount", {"$ifNull": ["$advance_deduction", 0]}]}}}}]).to_list(1)
     total = float(paid[0]["t"]) if paid else 0.0
     applied = float(used[0]["t"]) if used else 0.0
     return {"account_type": acc["type"], "advance_total": r2(total), "applied": r2(applied), "outstanding": r2(max(total - applied, 0))}
@@ -185,6 +185,8 @@ async def pay_progress(pid: str, data: PayIn, background: BackgroundTasks, user=
         raise HTTPException(status_code=404, detail="Hakediş bulunamadı")
     if h["status"] == "taslak":
         raise HTTPException(status_code=400, detail="Önce hakedişi onaylayın")
+    if h.get("type") == "musteri":
+        raise HTTPException(status_code=400, detail="Müşteri tahsilatı hakediş üzerinden alınmaz; İşlemler → Tahsilat ile kaydedin. Avans ve tahsilatlar hakedişten otomatik düşülür.")
     if data.nakit_amount <= 0 and data.cek_amount <= 0:
         raise HTTPException(status_code=400, detail="Nakit veya çek tutarı girin")
     if data.cek_amount > 0 and not data.check_due_date:
