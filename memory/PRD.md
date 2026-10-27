@@ -66,3 +66,27 @@
 - Backend: settings `github_repo`, `testflight_url` + `PUT /api/settings/distribution` (yönetici; repo formatı doğrulanır).
 - Frontend: `/indir` Downloads sayfası (3 platform kartı, indir linkleri `github.com/<repo>/releases/latest/download/...`, yönetici dağıtım formu, adım adım GitHub/Apple ASC API key/secrets rehberi), menüye "Uygulamayı indir" eklendi, Telefona Kur → İndir bağlantısı.
 - KULLANICI ADIMLARI (bekleyen): Save to GitHub → depo adını /indir'e yaz → Actions'ı etkinleştir → Apple secret'ları ekle → TestFlight Public Link'i /indir'e yapıştır.
+
+## 2026-06 — Finans kuralları v2 + Kasalar + WhatsApp + Mükerrer uyarı (iteration_7: backend 19/20 → statement düzeltildi, frontend PASS)
+- **Taşeron avansı ≠ şantiye gideri**: taşeron carisine yapılan her gider otomatik "Taşeron Avansı" olur (`create/update_transaction`); `site_summary.direct_expense` taşeron account_id'lerini hariç tutar; gider yalnızca onaylı taşeron hakedişi. "Taşeron Hakediş Ödemesi" kategorisi listeden kaldırıldı (hakediş "Öde" akışı iç kullanım).
+- **Avans mahsubu**: `ProgressIn.advance_deduction`; `GET /progress-payments/advance-balance?account_id` (hakedişe bağlı olmayan ödeme/tahsilat − önceki mahsuplar). Yeni hakediş formunda otomatik dolar (düzenlenebilir). `account_balance` ve ekstre brüt (net+avans) kullanır. Hakediş detayında "Hakediş − avans = kalan" özeti.
+- **Taşeron hakedişinde %6 yok** (calc: overhead yalnızca musteri).
+- **Kasalar**: `db.kasalar` (nakit, cek, genel_gider sistem; `/api/kasalar` CRUD, /kasalar sayfası, menü). Müşteri hakedişi onaylanınca KDV hariç tutarın %6'sı `type:"virman"` (kasa_from null) olarak Genel Gider Kasası'na gelir yazılır (`create_overhead_virman`, taslağa alınca/silince kalkar, startup backfill). `kasa_balances()` dashboard/raporlarda; P&L genel_gider = virman toplamı.
+- **Mükerrer uyarı**: `find_duplicates` (aynı cari, aynı tutar, ±1 gün) → `duplicate_of` alanı, `GET /transactions/check-duplicate`, formda confirm, listede kırmızı rozet + banner, push başlığında ⚠️.
+- **WhatsApp**: `/api/whatsapp/template|parse|inbound` (Twilio webhook; MANAGER_PHONE veya users.phone eşleşmesi; TwiML yanıt). İşlemler → "WhatsApp'tan Al": şablon kopyala, mesaj yapıştır → oku → forma aktar → kaydet. Manifest `share_target` → /islemler?text=.
+- **İşlemler arama** (tx-search-input), **Şantiye durum filtreleri** (devam sarı / tamamlanan yeşil / planlanan mavi / durdurulan / tümü, URL ?durum=), **Cari aktif/pasif** (`is_active`, PATCH /accounts/{id}/active; ödeme formlarında yalnızca aktifler), **TxActions** (cari ekstre + şantiye detayında düzelt/sil), **Planlı ödeme 'çek' türü + kasa** (Ödendi → gider + çek kaydı).
+- Açık: Twilio inbound için Twilio konsolunda webhook URL `https://hakedis-takip-3.emergent.host/api/whatsapp/inbound` girilmeli (Twilio anahtarları hâlâ eksik).
+
+## 2026-06 — Müşteri tahsilat akışı düzeltmesi + filtreler + özet şeridi + GitHub durum (iteration_8: backend 10/10, frontend PASS; virman ödeme sayılmama düzeltmesi sonradan yapıldı)
+- Müşteri hakedişinde "Tahsilat Al" KALDIRILDI (çift sayım: avans 3M + hakediş 8M → 11M). `POST /progress-payments/{id}/pay` müşteri için 400. Detayda "Tahsilat Gir (İşlemler)" → `/islemler?yeni=gelir&account_id&site_id` formu açar. Hakediş ödemeleri/kalan hesabında `virman` hariç.
+- `outstanding_advance` = Σ tüm onaylı ödeme/tahsilat − Σ diğer onaylı hakediş brüt (fazla ödenen = avans). Müşteri geliri otomatik kategori: açık hakediş borcu varsa "Hakediş Tahsilatı", yoksa "Avans".
+- İşlem ve hakediş formlarında şantiye↔cari filtresi (`accounts.site_ids`): şantiye seçilince yalnızca o şantiyeye atanmış cariler; cari seçilince yalnızca atanmış şantiyeler.
+- Dashboard `summary` + "quick-summary" şeridi: Kasa toplamı · Onaylı gider · Onay bekleyen gider · Hakediş onayı (taslak) · Planlı ödemeler.
+- GitHub: `_parse_repo` tam URL kabul eder; `GET /settings/distribution/status` GitHub public API ile depo/workflow/çalışma/release durumunu ve yapılacak adımları döner; /indir sayfasında BuildStatus paneli.
+- Not: %6 virman apply_overhead bayrağından bağımsız (kullanıcı kuralı: müşteri hakedişinde KDV hariç %6 her zaman).
+
+## 2026-06 — Dekont okuma + avans hatırlatma (iteration_9: backend 8/8, frontend PASS)
+- `POST /api/receipt/parse` (routers/receipt.py): görsel → PIL normalize (JPEG ≤1600px) → LlmChat gpt-6-sol + ImageContent → JSON (amount/date/payer/payee/bank/reference) → cari eşleme (kendi firma adı hariç; payee→payer) → type/category. UI: Yeni İşlem formunda `ReceiptScan` (receipt-scan-button) tutar/tarih/cari/açıklama doldurur, görseli eke yükler.
+- Günlük özet `advances`: taşeron ≥30 gün kapatılmamış avans, müşteri avans bakiyeleri; mesajda "💰 Açık avanslar"; DailySummary'de `advance-reminders` linkleri.
+- Twilio: kullanıcı iki kez geçersiz değer girdi (telefon numarası / 5 karakter). Twilio hesabı yok görünüyor; "Twilio hazır" deyince secrets kartı tekrar açılacak. Webhook: /api/whatsapp/inbound.
+- GitHub derleme: kullanıcı henüz Save to GitHub yapmadı; /indir sayfası BuildStatus paneli adımları gösteriyor.

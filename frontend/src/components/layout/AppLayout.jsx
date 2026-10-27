@@ -34,6 +34,7 @@ const MORE = [
   { to: "/takvim", label: "Vade Takvimi", icon: CalendarDays, id: "calendar" },
   { to: "/odeme-takvimi", label: "Sabit Giderler (SSK, kredi, kira)", icon: CalendarClock, id: "payments" },
   { to: "/raporlar?tab=kasa", label: "Kasa / Banka", icon: Wallet, id: "cash", perm: "view_reports" },
+  { to: "/kasalar", label: "Kasalar (ekle / düzenle)", icon: Wallet, id: "kasalar" },
   { to: "/raporlar?tab=para_akisi", label: "Para Akışı", icon: Activity, id: "cashflow" },
   { to: "/asistan", label: "Yapay Zeka Asistan", icon: Sparkles, id: "ai" },
   { to: "/yonetim/kullanicilar", label: "Yönetim (alt kullanıcılar ve yetkiler)", icon: UserCog, id: "users", admin: true },

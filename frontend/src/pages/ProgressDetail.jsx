@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
+import { useKasalar } from "@/lib/kasa";
 import { api, errMsg, openPdf, downloadFile } from "@/lib/api";
 import { fmtTL, fmtDate, today, STATUS_LABELS } from "@/lib/format";
 import { PageHeader, StatusBadge, Money, Field } from "@/components/shared/Bits";
@@ -17,6 +18,7 @@ export default function ProgressDetail() {
   const nav = useNavigate();
   const qc = useQueryClient();
   const { user, isManager, can } = useAuth();
+  const { kasaName } = useKasalar();
   const [payOpen, setPayOpen] = useState(false);
   const { data: h } = useQuery({ queryKey: ["progress", id], queryFn: () => api.get(`/progress-payments/${id}`).then((r) => r.data) });
   const { data: pays } = useQuery({ queryKey: ["progress-pays", id], queryFn: () => api.get(`/progress-payments/${id}/payments`).then((r) => r.data) });
@@ -36,7 +38,8 @@ export default function ProgressDetail() {
           <GoldButton variant="outline" onClick={() => ai.mutate()} disabled={ai.isPending} data-testid="progress-ai-button">{ai.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />} AI Özet</GoldButton>
           {canStatus && h.status === "taslak" && <GoldButton onClick={() => status.mutate("onaylandi")} data-testid="progress-approve-button">Onayla</GoldButton>}
           {canStatus && h.status === "onaylandi" && <GoldButton onClick={() => status.mutate("odendi")} data-testid="progress-paid-button">Ödendi İşaretle</GoldButton>}
-          {h.status !== "taslak" && <GoldButton onClick={() => setPayOpen(true)} data-testid="progress-pay-button"><Wallet className="w-4 h-4" /> {h.type === "taseron" ? "Ödeme Yap" : "Tahsilat Al"}</GoldButton>}
+          {h.status !== "taslak" && h.type === "taseron" && <GoldButton onClick={() => setPayOpen(true)} data-testid="progress-pay-button"><Wallet className="w-4 h-4" /> Ödeme Yap</GoldButton>}
+          {h.type === "musteri" && <Link to={`/islemler?yeni=gelir&account_id=${h.account_id || ""}&site_id=${h.site_id || ""}`} className="inline-flex items-center gap-2 rounded-full border border-gold text-gold-dark px-5 py-2.5 text-sm font-medium hover:bg-gold-bg transition-colors" data-testid="progress-customer-collect-link"><Wallet className="w-4 h-4" /> Tahsilat Gir (İşlemler)</Link>}
           {can("edit_progress") && (h.status !== "odendi" || isManager) && <GoldButton variant="outline" onClick={() => nav(`/hakedis/${h.id}/duzenle`)} data-testid="progress-edit-button"><Pencil className="w-4 h-4" /> Düzenle</GoldButton>}
           {isManager && <button onClick={() => window.confirm("Hakediş silinsin mi?") && del.mutate()} className="p-2 rounded-full hover:bg-red-50 text-red-700" data-testid="progress-delete-button"><Trash2 className="w-5 h-5" /></button>}
         </>} />
@@ -52,7 +55,8 @@ export default function ProgressDetail() {
           <div className="flex justify-between"><span>Ara toplam</span><Money value={h.subtotal} /></div>
           {h.overhead_amount > 0 && <div className="flex justify-between text-gold-dark"><span>Genel gider kesintisi (%6)</span><span className="money">−{fmtTL(h.overhead_amount)}</span></div>}
           {h.retention_amount > 0 && <div className="flex justify-between"><span>Teminat (%{h.retention_rate})</span><span className="money">−{fmtTL(h.retention_amount)}</span></div>}
-          {h.previous_deduction > 0 && <div className="flex justify-between"><span>Önceki kesinti / avans</span><span className="money">−{fmtTL(h.previous_deduction)}</span></div>}
+          {h.previous_deduction > 0 && <div className="flex justify-between"><span>Önceki kesinti</span><span className="money">−{fmtTL(h.previous_deduction)}</span></div>}
+          {h.advance_deduction > 0 && <div className="flex justify-between text-amber-700" data-testid="progress-detail-advance"><span>Avans mahsubu (önceden alınan/verilen avans)</span><span className="money">−{fmtTL(h.advance_deduction)}</span></div>}
           <div className="flex justify-between"><span>KDV matrahı</span><Money value={h.base_amount} /></div>
           <div className="flex justify-between"><span>KDV %{h.vat_rate}</span><Money value={h.vat_amount} /></div>
           <div className="flex justify-between border-t-2 border-gold pt-2 text-xl font-semibold text-gold"><span>Net ödenecek</span><Money value={h.net_amount} /></div>
@@ -70,8 +74,13 @@ export default function ProgressDetail() {
             <div className="flex gap-4 text-sm"><span>Ödenen <Money value={pays.paid} className="font-semibold text-emerald-700" /></span>{pays.pending > 0 && <span>Onay bekleyen <Money value={pays.pending} className="font-semibold text-amber-700" /></span>}<span>Kalan <Money value={pays.remaining} className="font-semibold text-gold" data-testid="progress-remaining" /></span></div>
           </div>
           <div className="h-2 rounded-full bg-stone-100 mb-4"><div className="h-full rounded-full bg-emerald-600" style={{ width: `${Math.min(100, (pays.paid / (h.net_amount || 1)) * 100)}%` }} /></div>
+          <p className="text-xs text-charcoal-light mb-3 bg-gold-bg/60 border border-gold-border rounded-xl px-3 py-2" data-testid="progress-collect-summary">
+            {h.type === "taseron"
+              ? <>Hakediş {fmtTL(h.net_amount + (h.advance_deduction || 0))}{h.advance_deduction > 0 ? ` − avans mahsubu ${fmtTL(h.advance_deduction)}` : ""} = <b>{fmtTL(h.net_amount)}</b> ödenecek; şimdiye kadar {fmtTL(pays.paid)} ödendi, <b>kalan {fmtTL(pays.remaining)}</b>.</>
+              : <>Hakediş brüt {fmtTL(h.net_amount + (h.advance_deduction || 0))}{h.advance_deduction > 0 ? ` − müşteriden önceden alınan avans ${fmtTL(h.advance_deduction)}` : ""} = <b>{fmtTL(h.net_amount)}</b> müşteri alacağı. Müşteriden alınan her ödeme İşlemler'den tahsilat olarak girilir ve cari bakiyeden otomatik düşer; hakediş üzerinden ayrıca tahsilat alınmaz (çift sayım olmaz).{h.overhead_tx_id ? ` %6 genel gider payı (${fmtTL((h.subtotal || 0) * 0.06)}) Genel Gider Kasası'na aktarıldı.` : ""}</>}
+          </p>
           {pays.rows.length === 0 ? <p className="text-sm text-charcoal-muted">Henüz ödeme yok</p> : pays.rows.map((t) => (
-            <div key={t.id} className="row-line" data-testid={`progress-pay-row-${t.id}`}><span>{fmtDate(t.date)} · {t.kasa === "cek" ? "Devrantaş Çek" : "Devrantaş Nakit"} · {t.description} <StatusBadge status={t.status} className="ml-1" /></span><Money value={t.amount} className="font-semibold" /></div>))}
+            <div key={t.id} className="row-line" data-testid={`progress-pay-row-${t.id}`}><span>{fmtDate(t.date)} · {kasaName(t.kasa)} · {t.description} <StatusBadge status={t.status} className="ml-1" /></span><Money value={t.amount} className="font-semibold" /></div>))}
         </div>
       )}
       <Dialog open={payOpen} onOpenChange={setPayOpen}>

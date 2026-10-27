@@ -1,0 +1,34 @@
+{
+  "summary": "Iteration 9: Receipt OCR (POST /api/receipt/parse) + advance reminders in daily-summary + regressions. Backend 8/8 pytest pass (real LLM vision call with a PIL-generated Ziraat dekont JPEG: amount 50000, date 2026-10-26, payee->TEST_ taşeron matched, gider/Taşeron Avansı; payer=TEST_ müşteri & payee=Devrantaş Yapı -> müşteri matched, gelir; text file ->400; no auth ->401; advances: TEST_ müşteri 100000 gelir listed type musteri, TEST_ taşeron gider 40 days ago listed days>=40, taşeron gider today NOT listed, message contains '💰 Açık avanslar'; whatsapp/parse and dashboard regression OK). Frontend desktop 1920 + mobile 390: dashboard advance-reminders shows 2 real links (Dorukhan yapı, Ayde yapı) navigating to /cari/musteri/{id}; /islemler -> Yeni İşlem -> receipt-scan-button visible; set_input_files on receipt-scan-input -> amount 50000, date 2026-10-26, category Taşeron Avansı, account select = matched TEST_ taşeron, description 'Ekim avansı', kasa nakit, /api/files/upload 201 and 'Dosya eklendi' attachment shown. No horizontal overflow on mobile.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/receipt/parse", "issue": "502 error detail includes raw exception string (f'Dekont okunamadı: {e}') - may leak internal LLM/key errors to user"},
+      {"endpoint": "/api/receipt/parse", "issue": "If PIL fails to decode but client sends content_type image/jpeg, corrupt bytes are forwarded to the LLM (ends as 502 instead of a clean 400)"},
+      {"endpoint": "/api/receipt/parse", "issue": "kasa always hardcoded 'nakit' even for bank EFT dekont; category for müşteri always 'Hakediş Tahsilatı' (consider 'Avans' when no open hakediş)"}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Transactions > Yeni İşlem (mobile 390)", "issues": ["ReceiptScan row is flex without wrap: after a scan the result text (bank · Gönderen · Alıcı → cari) is squeezed into a ~80px column next to the button, producing ~10 lines of 1-2 words. Use flex-col/flex-wrap on small screens (sm:flex-row)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iteration9_receipt_advances.py", "/app/test_reports/pytest/iter9.xml"],
+  "action_items": [
+    "Make ReceiptScan layout wrap/stack on mobile so result text is readable",
+    "Sanitize 502 error message in receipt parse; return 400 when image cannot be decoded"
+  ],
+  "critical_code_review_comments": [
+    "alerts.py advances loop: per-account account_balance + 2 extra queries (N+1) on every daily-summary fetch (refetch every 5 min) - fine now, consider aggregation if accounts grow",
+    "receipt._resolve own-company check uses only first word of company name (own.split()[0]); any counterparty containing 'devrantas' would be skipped - acceptable but note",
+    "Taşeron with negative balance but no gider after last hakediş gets days=None and is silently skipped"
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration9_receipt_advances.py"],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "100% of tested flows"},
+  "seed_data_creation": "TEST_ accounts/transactions created and deleted (pytest teardown + manual cleanup of TEST_UI Hamza Yıldırımoğlu). Verified advances afterwards only contain real Dorukhan yapı and Ayde yapı.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run pytest with '-n 0' if you need -s ordering (pytest.ini adds xdist). Admin-created gider tx start as onay_bekliyor; approve via POST /api/transactions/{id}/approve. make_receipt() helper in test_iteration9 generates dekont JPEG with DejaVu fonts. LLM receipt call took ~2-5s. App date is 2026-10-27. Twilio not configured - not tested."
+}

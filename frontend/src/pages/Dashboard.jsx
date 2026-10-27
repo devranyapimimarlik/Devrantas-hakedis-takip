@@ -19,16 +19,31 @@ export default function Dashboard() {
       <PageHeader eyebrow="Genel Bakış" title="Finansal Durum" subtitle={`${data.active_sites} aktif şantiye · Toplam ${data.site_count} proje · Bugün ${fmtDate(data.today)}`} />
       <ReminderBanners compact />
       <DailySummaryCard compact />
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6" data-testid="quick-summary">
+        {[
+          ["Kasa Toplamı", fmtTL(data.kasa.toplam), `${(data.kasa.list || []).length} kasa`, "/kasalar", Wallet, "text-charcoal", "quick-kasa"],
+          ["Onaylı Gider", fmtTL(data.summary?.approved_expense_all || 0), "tüm onaylı ödemeler", "/islemler?tab=gider", TrendingDown, "text-red-700", "quick-approved"],
+          ["Onay Bekleyen Gider", fmtTL(data.summary?.pending_expense.total || 0), `${data.summary?.pending_expense.count || 0} kayıt`, "/islemler?tab=bekleyen", ClipboardCheck, "text-amber-700", "quick-pending"],
+          ["Hakediş Onayı", fmtTL(data.summary?.pending_progress.total || 0), `${data.summary?.pending_progress.count || 0} taslak hakediş`, "/hakedis", Percent, "text-sky-700", "quick-progress"],
+          ["Planlı Ödemeler", fmtTL(data.summary?.planned_payments.total || 0), `${data.summary?.planned_payments.count || 0} bekleyen`, "/odeme-takvimi", Banknote, "text-gold-dark", "quick-planned"],
+        ].map(([label, val, sub, to, Icon, tone, tid]) => (
+          <Link key={tid} to={to} className="soft-card p-3.5 hover:bg-gold-bg/40 transition-colors min-w-0" data-testid={tid}>
+            <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-charcoal-muted"><Icon className="w-3.5 h-3.5 text-gold" />{label}</div>
+            <p className={`money text-lg font-semibold mt-1 truncate ${tone}`}>{val}</p>
+            <p className="text-[11px] text-charcoal-light truncate">{sub}</p>
+          </Link>))}
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
         <StatCard label="Toplam Sözleşme" value={fmtTL(t.contract)} hint={`Tahmini %6 genel gider: ${fmtTL(t.overhead)}`} icon={Wallet} testId="stat-contract" />
-        <StatCard label="Toplam Tahsilat" value={fmtTL(t.income)} hint={`%6 genel gider (tahsilat üzerinden): ${fmtTL(t.realized_overhead)}`} tone="green" icon={TrendingUp} testId="stat-income" delay={60} />
-        <StatCard label="Onaylı Gider" value={fmtTL(t.expense)} hint={`Onay bekleyen: ${fmtTL(t.pending)}`} tone="red" icon={TrendingDown} testId="stat-expense" delay={120} />
-        <StatCard label="Gerçekleşen Kâr" value={fmtTL(t.realized_profit)} hint={`Tahsilat − %6 − gider · Tahmini (sözleşme): ${fmtTL(t.profit)}`} tone={t.realized_profit >= 0 ? "green" : "red"} icon={Percent} testId="stat-profit" delay={180} />
+        <StatCard label="Toplam Tahsilat" value={fmtTL(t.income)} hint={`%6 genel gider kasasına aktarılan: ${fmtTL(t.realized_overhead)}`} tone="green" icon={TrendingUp} testId="stat-income" delay={60} />
+        <StatCard label="Onaylı Gider" value={fmtTL(t.expense)} hint={`Onay bekleyen: ${fmtTL(t.pending)} · taşeron avansları hariç`} tone="red" icon={TrendingDown} testId="stat-expense" delay={120} />
+        <StatCard label="Gerçekleşen Kâr" value={fmtTL(t.realized_profit)} hint={`Tahsilat − %6 payı − gider · Tahmini (sözleşme): ${fmtTL(t.profit)}`} tone={t.realized_profit >= 0 ? "green" : "red"} icon={Percent} testId="stat-profit" delay={180} />
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-        <div className="gold-card p-5 flex items-center gap-4" data-testid="kasa-nakit-card"><Wallet className="w-8 h-8 text-gold" /><div><p className="label-gold">Devrantaş Nakit Kasa</p><p className={`money text-xl font-semibold ${data.kasa.nakit < 0 ? "text-red-700" : "text-charcoal"}`}>{fmtTL(data.kasa.nakit)}</p></div></div>
-        <div className="gold-card p-5 flex items-center gap-4" data-testid="kasa-cek-card"><Banknote className="w-8 h-8 text-gold" /><div><p className="label-gold">Devrantaş Çek Kasa</p><p className={`money text-xl font-semibold ${data.kasa.cek < 0 ? "text-red-700" : "text-charcoal"}`}>{fmtTL(data.kasa.cek)}</p></div></div>
-        <div className="gold-card p-5 flex items-center gap-4 bg-gold-bg/60" data-testid="kasa-toplam-card"><Wallet className="w-8 h-8 text-gold-dark" /><div><p className="label-gold">Toplam Kasa</p><p className="money text-xl font-semibold text-gold-dark">{fmtTL(data.kasa.toplam)}</p></div></div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8" data-testid="kasa-cards">
+        {(data.kasa.list || []).map((k) => (
+          <div key={k.id} className="gold-card p-5 flex items-center gap-4" data-testid={`kasa-${k.id}-card`}>{k.kind === "cek" ? <Banknote className="w-8 h-8 text-gold" /> : <Wallet className="w-8 h-8 text-gold" />}<div className="min-w-0"><p className="label-gold truncate">{k.name}</p><p className={`money text-xl font-semibold ${k.balance < 0 ? "text-red-700" : "text-charcoal"}`}>{fmtTL(k.balance)}</p></div></div>))}
+        <Link to="/kasalar" className="gold-card p-5 flex items-center gap-4 bg-gold-bg/60 hover:bg-gold-bg" data-testid="kasa-toplam-card"><Wallet className="w-8 h-8 text-gold-dark" /><div><p className="label-gold">Toplam Kasa</p><p className="money text-xl font-semibold text-gold-dark">{fmtTL(data.kasa.toplam)}</p><p className="text-[11px] text-charcoal-muted">Kasa ekle / düzenle →</p></div></Link>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <Link to="/islemler?status=onay_bekliyor" className="gold-card p-5 flex items-center gap-4 hover:bg-gold-bg/40" data-testid="pending-approvals-card">

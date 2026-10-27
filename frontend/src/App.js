@@ -7,6 +7,7 @@ import { SettingsProvider } from "@/context/SettingsContext";
 import Appearance from "@/pages/Appearance";
 import Install from "@/pages/Install";
 import Downloads from "@/pages/Downloads";
+import Kasalar from "@/pages/Kasalar";
 import Portal from "@/pages/Portal";
 import AppLayout from "@/components/layout/AppLayout";
 import Login from "@/pages/Login";
@@ -73,6 +74,7 @@ export default function App() {
             <Route path="/ayarlar/gorunum" element={<Protected admin><Appearance /></Protected>} />
             <Route path="/telefona-kur" element={<Install />} />
             <Route path="/indir" element={<Downloads />} />
+            <Route path="/kasalar" element={<Kasalar />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

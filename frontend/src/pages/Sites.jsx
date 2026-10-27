@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api, errMsg } from "@/lib/api";
 import { fmtTL, fmtDate, today } from "@/lib/format";
 import { PageHeader, StatusBadge, EmptyState, Field, OverheadTag } from "@/components/shared/Bits";
@@ -51,18 +51,38 @@ export function SiteForm({ initial = EMPTY, onDone }) {
   );
 }
 
+const STATUS_FILTERS = [
+  ["devam", "Devam eden", "bg-amber-100 text-amber-800 border-amber-300", "bg-amber-500 text-white border-amber-500"],
+  ["tamamlandi", "Tamamlanan", "bg-emerald-50 text-emerald-800 border-emerald-300", "bg-emerald-600 text-white border-emerald-600"],
+  ["planlama", "Planlanan", "bg-sky-50 text-sky-800 border-sky-300", "bg-sky-600 text-white border-sky-600"],
+  ["durduruldu", "Durdurulan", "bg-stone-100 text-stone-700 border-stone-300", "bg-stone-600 text-white border-stone-600"],
+  ["tumu", "Tümü", "bg-white text-charcoal border-stone-200", "bg-charcoal text-white border-charcoal"],
+];
+
 export default function Sites() {
   const [open, setOpen] = useState(false);
+  const [sp, setSp] = useSearchParams();
+  const filter = sp.get("durum") || "devam";
   const { data = [], isLoading } = useQuery({ queryKey: ["sites"], queryFn: () => api.get("/sites").then((r) => r.data) });
+  const counts = data.reduce((m, s) => ({ ...m, [s.status || "devam"]: (m[s.status || "devam"] || 0) + 1 }), {});
+  const rows = filter === "tumu" ? data : data.filter((s) => (s.status || "devam") === filter);
+  const label = STATUS_FILTERS.find((x) => x[0] === filter)?.[1];
   return (
     <div data-testid="sites-page">
       <PageHeader eyebrow="Projeler" title="Şantiyeler" subtitle="Her şantiye için sözleşme bedeli, %6 genel gider kesintisi, gelir-gider ve kâr marjı."
         actions={<GoldButton onClick={() => setOpen(true)} data-testid="add-site-button"><Plus className="w-4 h-4" /> Yeni Şantiye</GoldButton>} />
-      {isLoading ? <div className="h-40 animate-pulse bg-white/60 rounded-xl" /> : data.length === 0 ? (
-        <EmptyState title="Henüz şantiye yok" desc="İlk projenizi ekleyerek başlayın." action={<GoldButton variant="outline" onClick={() => setOpen(true)}>Şantiye Ekle</GoldButton>} testId="sites-empty" />
+      <div className="flex gap-2 overflow-x-auto pb-2 mb-5 -mx-4 px-4 md:mx-0 md:px-0" data-testid="site-status-filters">
+        {STATUS_FILTERS.map(([k, l, idle, active]) => (
+          <button key={k} onClick={() => setSp({ durum: k })} className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-medium transition-colors ${filter === k ? active : idle}`} data-testid={`site-filter-${k}`}>
+            {l}<span className={`text-[11px] font-mono rounded-full px-1.5 ${filter === k ? "bg-white/25" : "bg-black/5"}`}>{k === "tumu" ? data.length : counts[k] || 0}</span>
+          </button>
+        ))}
+      </div>
+      {isLoading ? <div className="h-40 animate-pulse bg-white/60 rounded-xl" /> : rows.length === 0 ? (
+        <EmptyState title={data.length === 0 ? "Henüz şantiye yok" : `${label} şantiye yok`} desc={data.length === 0 ? "İlk projenizi ekleyerek başlayın." : "Üstteki durum seçeneklerinden başka bir grubu açın."} action={<GoldButton variant="outline" onClick={() => setOpen(true)}>Şantiye Ekle</GoldButton>} testId="sites-empty" />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5" data-testid="sites-grid">
-          {data.map((s, i) => {
+          {rows.map((s, i) => {
             const sm = s.summary;
             return (
               <Link key={s.id} to={`/santiyeler/${s.id}`} className="gold-card p-5 md:p-6 fade-up block hover:-translate-y-0.5 transition-transform" style={{ animationDelay: `${i * 50}ms` }} data-testid={`site-card-${s.id}`}>
