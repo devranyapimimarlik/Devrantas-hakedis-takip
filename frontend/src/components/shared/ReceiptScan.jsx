@@ -24,7 +24,7 @@ export function ReceiptScan({ onResult }) {
     finally { setBusy(false); }
   };
   return (
-    <div className="rounded-2xl border border-dashed border-gold-border bg-gold-bg/30 p-3 flex items-center gap-3" data-testid="receipt-scan">
+    <div className="rounded-2xl border border-dashed border-gold-border bg-gold-bg/30 p-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3" data-testid="receipt-scan">
       <input ref={ref} type="file" accept="image/*" capture="environment" className="hidden" onChange={pick} data-testid="receipt-scan-input" />
       <button type="button" onClick={() => ref.current?.click()} disabled={busy} className="inline-flex items-center gap-2 rounded-full bg-charcoal text-white px-4 py-2 text-sm font-medium disabled:opacity-60" data-testid="receipt-scan-button">
         {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanLine className="w-4 h-4" />} {busy ? "Dekont okunuyor…" : "Dekontu Fotoğrafla / Oku"}

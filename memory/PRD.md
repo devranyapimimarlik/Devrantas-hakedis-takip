@@ -84,3 +84,9 @@
 - Dashboard `summary` + "quick-summary" şeridi: Kasa toplamı · Onaylı gider · Onay bekleyen gider · Hakediş onayı (taslak) · Planlı ödemeler.
 - GitHub: `_parse_repo` tam URL kabul eder; `GET /settings/distribution/status` GitHub public API ile depo/workflow/çalışma/release durumunu ve yapılacak adımları döner; /indir sayfasında BuildStatus paneli.
 - Not: %6 virman apply_overhead bayrağından bağımsız (kullanıcı kuralı: müşteri hakedişinde KDV hariç %6 her zaman).
+
+## 2026-06 — Dekont okuma + avans hatırlatma (iteration_9: backend 8/8, frontend PASS)
+- `POST /api/receipt/parse` (routers/receipt.py): görsel → PIL normalize (JPEG ≤1600px) → LlmChat gpt-6-sol + ImageContent → JSON (amount/date/payer/payee/bank/reference) → cari eşleme (kendi firma adı hariç; payee→payer) → type/category. UI: Yeni İşlem formunda `ReceiptScan` (receipt-scan-button) tutar/tarih/cari/açıklama doldurur, görseli eke yükler.
+- Günlük özet `advances`: taşeron ≥30 gün kapatılmamış avans, müşteri avans bakiyeleri; mesajda "💰 Açık avanslar"; DailySummary'de `advance-reminders` linkleri.
+- Twilio: kullanıcı iki kez geçersiz değer girdi (telefon numarası / 5 karakter). Twilio hesabı yok görünüyor; "Twilio hazır" deyince secrets kartı tekrar açılacak. Webhook: /api/whatsapp/inbound.
+- GitHub derleme: kullanıcı henüz Save to GitHub yapmadı; /indir sayfası BuildStatus paneli adımları gösteriyor.

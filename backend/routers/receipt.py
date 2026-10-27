@@ -61,8 +61,7 @@ async def parse_receipt(file: UploadFile = File(...), user=Depends(get_current_u
         buf = BytesIO(); im.save(buf, format="JPEG", quality=85)
         raw, mime = buf.getvalue(), "image/jpeg"
     except Exception:
-        if mime not in ("image/jpeg", "image/png", "image/webp"):
-            raise HTTPException(status_code=400, detail="JPEG/PNG/WEBP fotoğraf yükleyin")
+        raise HTTPException(status_code=400, detail="Görsel çözümlenemedi; net bir JPEG/PNG dekont fotoğrafı yükleyin")
     b64 = base64.b64encode(raw).decode()
     parsed = {}
     try:
@@ -73,7 +72,7 @@ async def parse_receipt(file: UploadFile = File(...), user=Depends(get_current_u
         parsed = json.loads(m.group(0)) if m else {}
     except Exception as e:
         logger.warning(f"receipt LLM failed: {e}")
-        raise HTTPException(status_code=502, detail=f"Dekont okunamadı: {e}")
+        raise HTTPException(status_code=502, detail="Dekont şu anda okunamadı; tekrar deneyin ya da tutarı elle girin")
     if isinstance(parsed.get("amount"), str):
         parsed["amount"] = parse_amount(parsed["amount"])
     if parsed.get("date") and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(parsed["date"])):
