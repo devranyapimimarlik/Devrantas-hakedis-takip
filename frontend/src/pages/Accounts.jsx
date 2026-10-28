@@ -8,7 +8,7 @@ import { PageHeader, EmptyState, Field, Money } from "@/components/shared/Bits";
 import { NInput, NSelect, NTextarea, GoldButton } from "@/components/shared/Inputs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, ChevronRight, Link2, ToggleLeft, ToggleRight } from "lucide-react";
+import { Plus, Pencil, Trash2, ChevronRight, Link2 } from "lucide-react";
 
 const EMPTY = { name: "", phone: "", email: "", tax_no: "", address: "", specialty: "", notes: "" };
 
@@ -64,11 +64,7 @@ export default function Accounts({ type }) {
   const t = type || params.type;
   const isCust = t === "musteri";
   const [dlg, setDlg] = useState(null); // {mode:'new'|'edit'|'assign', account}
-  const [view, setView] = useState("aktif");
-  const { data: all = [], isLoading } = useQuery({ queryKey: ["accounts", t], queryFn: () => api.get("/accounts", { params: { type: t } }).then((r) => r.data) });
-  const data = all.filter((a) => view === "tumu" || (view === "aktif" ? a.is_active !== false : a.is_active === false));
-  const counts = { aktif: all.filter((a) => a.is_active !== false).length, pasif: all.filter((a) => a.is_active === false).length };
-  const toggle = useMutation({ mutationFn: (a) => api.patch(`/accounts/${a.id}/active`, { is_active: a.is_active === false }), onSuccess: (_, a) => { qc.invalidateQueries({ queryKey: ["accounts"] }); toast.success(a.is_active === false ? "Aktifleştirildi" : "Pasife alındı — ödeme listelerinde görünmez"); }, onError: (e) => toast.error(errMsg(e)) });
+  const { data = [], isLoading } = useQuery({ queryKey: ["accounts", t], queryFn: () => api.get("/accounts", { params: { type: t } }).then((r) => r.data) });
   const del = useMutation({ mutationFn: (id) => api.delete(`/accounts/${id}`), onSuccess: () => { qc.invalidateQueries({ queryKey: ["accounts"] }); toast.success("Silindi"); } });
   const portal = useMutation({
     mutationFn: (id) => api.post(`/accounts/${id}/portal-token`),
@@ -82,18 +78,13 @@ export default function Accounts({ type }) {
       <GoldButton size="lg" className="w-full mb-6 lg:hidden" onClick={() => setDlg({ mode: "new" })} data-testid="add-account-button-top"><Plus className="w-5 h-5" /> {isCust ? "Müşteri Ekle" : "Atama Yap / Taşeron Ekle"}</GoldButton>
       <PageHeader title={isCust ? "Müşteriler" : "Taşeronlar"} subtitle={`${data.length} kayıt · Toplam bakiye ${fmtTL(total)}`}
         actions={<GoldButton onClick={() => setDlg({ mode: "new" })} data-testid="add-account-button"><Plus className="w-4 h-4" /> Ekle</GoldButton>} />
-      <div className="flex gap-2 mb-5" data-testid="account-active-filters">
-        {[["aktif", `Aktif (${counts.aktif})`, "bg-emerald-600 text-white border-emerald-600"], ["pasif", `Pasif (${counts.pasif})`, "bg-stone-600 text-white border-stone-600"], ["tumu", "Tümü", "bg-charcoal text-white border-charcoal"]].map(([k, l, act]) => (
-          <button key={k} onClick={() => setView(k)} className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${view === k ? act : "bg-white border-stone-200 text-charcoal-light"}`} data-testid={`account-filter-${k}`}>{l}</button>))}
-      </div>
-      {isLoading ? <div className="h-40 animate-pulse bg-white/60 rounded-2xl" /> : data.length === 0 ? <EmptyState title={view === "pasif" ? "Pasif kayıt yok" : isCust ? "Müşteri yok" : "Taşeron yok"} testId="accounts-empty" /> : (
+      {isLoading ? <div className="h-40 animate-pulse bg-white/60 rounded-2xl" /> : data.length === 0 ? <EmptyState title={isCust ? "Müşteri yok" : "Taşeron yok"} testId="accounts-empty" /> : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" data-testid="accounts-list">
           {data.map((a, i) => (
-            <div key={a.id} className={`gold-card p-5 fade-up ${a.is_active === false ? "opacity-70" : ""}`} style={{ animationDelay: `${i * 40}ms` }} data-testid={`account-card-${a.id}`}>
+            <div key={a.id} className="gold-card p-5 fade-up" style={{ animationDelay: `${i * 40}ms` }} data-testid={`account-card-${a.id}`}>
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0"><h3 className="text-xl font-semibold text-charcoal truncate">{a.name}{a.is_active === false && <span className="ml-2 text-[10px] font-mono bg-stone-200 text-stone-700 rounded-full px-2 py-0.5 align-middle">PASİF</span>}</h3><p className="text-sm text-charcoal-light">{a.phone || a.specialty || a.email || "-"}</p></div>
+                <div className="min-w-0"><h3 className="text-xl font-semibold text-charcoal truncate">{a.name}</h3><p className="text-sm text-charcoal-light">{a.phone || a.specialty || a.email || "-"}</p></div>
                 <div className="flex gap-1 shrink-0">
-                  {can("edit_accounts") && <button onClick={() => toggle.mutate(a)} className="p-2 rounded-full hover:bg-gold-bg" title={a.is_active === false ? "Aktifleştir" : "Pasife al"} data-testid={`toggle-active-${a.id}`}>{a.is_active === false ? <ToggleLeft className="w-4 h-4 text-stone-500" /> : <ToggleRight className="w-4 h-4 text-emerald-600" />}</button>}
                   {can("edit_accounts") && <button onClick={() => setDlg({ mode: "edit", account: a })} className="p-2 rounded-full hover:bg-gold-bg" data-testid={`edit-account-${a.id}`}><Pencil className="w-4 h-4" /></button>}
                   <button onClick={() => window.confirm("Silinsin mi?") && del.mutate(a.id)} className="p-2 rounded-full hover:bg-red-50 text-red-700" data-testid={`delete-account-${a.id}`}><Trash2 className="w-4 h-4" /></button>
                 </div>

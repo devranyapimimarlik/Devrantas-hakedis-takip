@@ -82,28 +82,6 @@ async def build_daily_summary() -> dict:
         if h["created_at"] < (datetime.now(timezone.utc) - timedelta(days=7)).isoformat():
             anomalies.append({"kind": "taslak_hakedis", "text": f"7 günden eski taslak hakediş: No {h['number']} {tl(h['net_amount'])}", "ref_id": h["id"]})
 
-    # 5) Avans takibi: 30+ gündür hakedişle kapatılmamış taşeron avansları ve müşteri avans bakiyeleri
-    advances = []
-    cutoff = (today - timedelta(days=30)).isoformat()
-    async for a in db.accounts.find({"type": {"$in": ["taseron", "musteri"]}, "is_active": {"$ne": False}}, {"_id": 0}):
-        b = await account_balance(a)
-        if b["balance"] >= 0:
-            continue
-        open_adv = -b["balance"]
-        ttype = "gider" if a["type"] == "taseron" else "gelir"
-        last_hak = await db.progress_payments.find_one({"account_id": a["id"], "status": {"$in": ["onaylandi", "odendi"]}}, {"_id": 0, "date": 1}, sort=[("date", -1)])
-        q = {"account_id": a["id"], "type": ttype, "status": "onaylandi"}
-        if last_hak: q["date"] = {"$gt": last_hak["date"]}
-        oldest = await db.transactions.find_one(q, {"_id": 0, "date": 1}, sort=[("date", 1)])
-        since = (oldest or {}).get("date")
-        days = (today - date.fromisoformat(since)).days if since else None
-        if a["type"] == "taseron" and (days is None or days < 30):
-            continue
-        advances.append({"account_id": a["id"], "name": a["name"], "type": a["type"], "amount": r2(open_adv), "since": since, "days": days,
-                         "text": (f"{a['name']}: {tl(open_adv)} avans {days} gündür hakedişle kapatılmadı" if a["type"] == "taseron"
-                                  else f"{a['name']}: {tl(open_adv)} müşteri avansı bekliyor (hakediş hazırlanınca düşülür)" + (f", {days} gündür" if days else ""))})
-    advances.sort(key=lambda x: -(x["days"] or 0))
-
     # Mesaj metni
     lines = [f"*DEVRANTAŞ GÜNLÜK ÖZET — {today.strftime('%d.%m.%Y')}*", ""]
     if due_items:
@@ -131,14 +109,8 @@ async def build_daily_summary() -> dict:
         for a in anomalies[:10]: lines.append(f"• {a['text']}")
     else:
         lines.append("✅ Şüpheli kayıt bulunmadı.")
-    lines.append("")
-    if advances:
-        lines.append(f"*💰 Açık avanslar ({len(advances)}):*")
-        for a in advances[:10]: lines.append(f"• {a['text']}")
-    else:
-        lines.append("✅ 30 günü geçen açık avans yok.")
-    return {"date": ts, "due_items": due_items, "loss_risks": loss_risks, "customer_risks": customer_risks, "anomalies": anomalies, "advances": advances,
-            "message": "\n".join(lines), "alert_count": len(due_items) + len(loss_risks) + len(customer_risks) + len(anomalies) + len(advances)}
+    return {"date": ts, "due_items": due_items, "loss_risks": loss_risks, "customer_risks": customer_risks, "anomalies": anomalies,
+            "message": "\n".join(lines), "alert_count": len(due_items) + len(loss_risks) + len(customer_risks) + len(anomalies)}
 
 
 def twilio_configured() -> bool:

@@ -168,9 +168,7 @@ async def progress_pdf(pid: str, user=Depends(get_current_user)):
     if h.get("retention_amount"):
         rows.append((f"Teminat Kesintisi (%{h['retention_rate']:g})", f"- {tl(h['retention_amount'])}", False))
     if h.get("previous_deduction"):
-        rows.append(("Önceki Hakediş Kesintisi", f"- {tl(h['previous_deduction'])}", False))
-    if h.get("advance_deduction"):
-        rows.append(("Avans Mahsubu", f"- {tl(h['advance_deduction'])}", False))
+        rows.append(("Önceki Hakediş / Avans Kesintisi", f"- {tl(h['previous_deduction'])}", False))
     rows += [("KDV Matrahı", tl(h["base_amount"]), False), (f"KDV (%{h['vat_rate']:g})", tl(h["vat_amount"]), False),
              ("NET ÖDENECEK", tl(h["net_amount"]), True)]
     totals_table(story, rows)
