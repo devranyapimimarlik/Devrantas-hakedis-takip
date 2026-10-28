@@ -149,24 +149,12 @@ async def endorse_check(cid: str, data: EndorseIn, background: BackgroundTasks, 
 
 # ---------- Scheduled payments (Kira / Kart / Kredi) ----------
 class PaymentIn(BaseModel):
-    type: str  # kira | kredi_karti | kredi | cek | diger
+    type: str  # kira | kredi_karti | kredi | diger
     title: str
     amount: float
     due_date: str
     site_id: Optional[str] = None
-    account_id: Optional[str] = None
-    kasa: Optional[str] = "nakit"
-    category: Optional[str] = "Diğer"
     notes: Optional[str] = ""
-
-
-class PayDoneIn(BaseModel):
-    kasa: Optional[str] = None
-    date: Optional[str] = None
-    create_transaction: bool = True
-
-
-PAYMENT_TYPES = ("kira", "kredi_karti", "kredi", "cek", "diger")
 
 
 @router.get("/calendar")
@@ -217,7 +205,7 @@ async def list_payments(status: Optional[str] = None, user=Depends(get_current_u
 
 @router.post("/payments", status_code=201)
 async def create_payment(data: PaymentIn, user=Depends(get_current_user)):
-    if data.type not in PAYMENT_TYPES:
+    if data.type not in ("kira", "kredi_karti", "kredi", "diger"):
         raise HTTPException(status_code=400, detail="Geçersiz ödeme tipi")
     doc = {"id": new_id(), **data.model_dump(), "status": "bekliyor", "created_at": now_iso(), "created_by": user["id"]}
     await db.payments.insert_one(doc)
@@ -228,24 +216,12 @@ async def create_payment(data: PaymentIn, user=Depends(get_current_user)):
 
 
 @router.patch("/payments/{pid}/paid")
-async def pay_payment(pid: str, background: BackgroundTasks, data: Optional[PayDoneIn] = None, user=Depends(get_current_user)):
-    p = await db.payments.find_one({"id": pid}, {"_id": 0})
-    if not p:
+async def pay_payment(pid: str, user=Depends(get_current_user)):
+    res = await db.payments.update_one({"id": pid}, {"$set": {"status": "odendi", "paid_at": now_iso()}})
+    if not res.matched_count:
         raise HTTPException(status_code=404, detail="Ödeme bulunamadı")
-    data = data or PayDoneIn()
-    tx_id = p.get("transaction_id")
-    if data.create_transaction and not tx_id:
-        from routers.transactions import TransactionIn, create_transaction
-        kasa = data.kasa or p.get("kasa") or ("cek" if p["type"] == "cek" else "nakit")
-        cat = p.get("category") or {"kira": "Kira", "kredi_karti": "Genel Gider", "kredi": "Genel Gider", "cek": "Diğer"}.get(p["type"], "Diğer")
-        tx = TransactionIn(site_id=p.get("site_id"), account_id=p.get("account_id"), type="gider", category=cat, amount=p["amount"],
-                           date=data.date or today_str(), description=f"Planlı ödeme: {p['title']}", kasa=kasa,
-                           check_due_date=p["due_date"] if kasa == "cek" else None)
-        doc = await create_transaction(tx, background, user)
-        tx_id = doc["id"]
-    await db.payments.update_one({"id": pid}, {"$set": {"status": "odendi", "paid_at": now_iso(), "transaction_id": tx_id}})
     await db.reminders.update_many({"source_id": pid}, {"$set": {"dismissed": True}})
-    return {"ok": True, "transaction_id": tx_id}
+    return {"ok": True}
 
 
 @router.delete("/payments/{pid}")

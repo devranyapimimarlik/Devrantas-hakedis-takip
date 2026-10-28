@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from typing import Optional
 from datetime import date
-from core import db, site_summary, account_balance, r2, SUB_CATEGORIES, require_perm, taseron_ids, kasa_balances
+from core import db, site_summary, account_balance, r2, SUB_CATEGORIES, require_perm
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -32,25 +32,20 @@ async def reports(start: Optional[str] = None, end: Optional[str] = None, site_i
     today = date.today().isoformat()
 
     # Kasa (Devrantaş Nakit / Devrantaş Çek)
-    kb = await kasa_balances()
-    kasa_names = {k: v["name"] for k, v in kb.items()}
-    nakit = kb.get("nakit", {}).get("balance", 0.0)
-    cek_kasa = kb.get("cek", {}).get("balance", 0.0)
-    kasa_rows = [{"id": k, "name": v["name"], "kind": v.get("kind"), "balance": v["balance"]} for k, v in kb.items()]
+    nakit = sum(t["amount"] * (1 if t["type"] == "gelir" else -1) for t in txs if t.get("kasa", "nakit") == "nakit")
+    cek_kasa = sum(t["amount"] * (1 if t["type"] == "gelir" else -1) for t in txs if t.get("kasa") == "cek")
     movements = [{"id": t["id"], "date": t["date"], "title": t.get("description") or t["category"], "type": t["type"], "category": t["category"],
                   "amount": t["amount"], "site_name": site_names.get(t.get("site_id")), "account_name": acc_names.get(t.get("account_id")),
-                  "kasa": t.get("kasa"), "kasa_name": kasa_names.get(t.get("kasa"), t.get("kasa")), "kasa_from": t.get("kasa_from"), "kasa_from_name": kasa_names.get(t.get("kasa_from")),
-                  "attachment_file_id": t.get("attachment_file_id")} for t in txs[:200]]
+                  "kasa": t.get("kasa"), "attachment_file_id": t.get("attachment_file_id")} for t in txs[:200]]
 
-    # Kâr/Zarar per site (taşeron hakedişleri gider olarak dahil; taşeron avansları hariç)
-    sub_ids = set(await taseron_ids())
+    # Kâr/Zarar per site (taşeron hakedişleri gider olarak dahil)
     pl_sites = []
     for s in sites_all:
         sm = await site_summary(s)
         pl_sites.append({"id": s["id"], "name": s["name"], **sm})
     total_overhead = sum(p["realized_overhead"] for p in pl_sites)
     projected_overhead = sum(p["overhead_amount"] for p in pl_sites)
-    total_expense_pl = sum(p["total_expense"] for p in pl_sites) + sum(t["amount"] for t in txs if t["type"] == "gider" and not t.get("site_id") and t["category"] not in SUB_CATEGORIES and t.get("account_id") not in sub_ids)
+    total_expense_pl = sum(p["total_expense"] for p in pl_sites) + sum(t["amount"] for t in txs if t["type"] == "gider" and not t.get("site_id") and t["category"] not in SUB_CATEGORIES)
 
     # Müşteri risk
     all_checks_q = {} if not account_id else {"account_id": account_id}
@@ -100,7 +95,7 @@ async def reports(start: Optional[str] = None, end: Optional[str] = None, site_i
     monthly = {}
     for t in txs:
         m = (t.get("date") or "")[:7]
-        if not m or t["type"] not in ("gelir", "gider"): continue
+        if not m: continue
         monthly.setdefault(m, {"month": m, "gelir": 0, "gider": 0})
         monthly[m][t["type"]] += t["amount"]
     cashflow = sorted(monthly.values(), key=lambda x: x["month"])
@@ -108,7 +103,7 @@ async def reports(start: Optional[str] = None, end: Optional[str] = None, site_i
     pending_payments = await db.payments.find({"status": "bekliyor"}, {"_id": 0}).sort("due_date", 1).to_list(500)
 
     return {
-        "kasa": {"nakit": r2(nakit), "cek_kasasi": r2(cek_kasa), "genel_gider": r2(kb.get("genel_gider", {}).get("balance", 0.0)), "toplam": r2(sum(v["balance"] for v in kb.values())), "list": kasa_rows, "movements": movements},
+        "kasa": {"nakit": r2(nakit), "cek_kasasi": r2(cek_kasa), "toplam": r2(nakit + cek_kasa), "movements": movements},
         "kar_zarar": {"gelir": r2(income), "gider": r2(total_expense_pl), "genel_gider": r2(total_overhead),
                       "net": r2(income - total_expense_pl - total_overhead),
                       "sozlesme": r2(sum(p["contract_amount"] for p in pl_sites)), "tahmini_genel_gider": r2(projected_overhead),
@@ -132,12 +127,12 @@ ST = {"portfoyde": "Portföyde", "tahsil_edildi": "Tahsil Edildi", "odendi": "Ö
 def _table_for(tab: str, d: dict):
     if tab == "kasa":
         cols = ["Tarih", "Açıklama", "Tür", "Kasa", "Şantiye", "Cari", "Tutar"]
-        rows = [[m["date"], m["title"], {"gelir": "Tahsilat", "gider": "Ödeme"}.get(m["type"], "Virman"), (f"{m.get('kasa_from_name')} → " if m["type"] == "virman" else "") + (m.get("kasa_name") or ""), m["site_name"] or "", m["account_name"] or "", m["amount"] if m["type"] in ("gelir", "virman") else -m["amount"]] for m in d["kasa"]["movements"]]
-        summ = [(k["name"], k["balance"]) for k in d["kasa"]["list"]] + [("Toplam Kasa", d["kasa"]["toplam"])]
+        rows = [[m["date"], m["title"], "Tahsilat" if m["type"] == "gelir" else "Ödeme", "Devrantaş Çek" if m["kasa"] == "cek" else "Devrantaş Nakit", m["site_name"] or "", m["account_name"] or "", m["amount"] if m["type"] == "gelir" else -m["amount"]] for m in d["kasa"]["movements"]]
+        summ = [("Devrantaş Nakit", d["kasa"]["nakit"]), ("Devrantaş Çek", d["kasa"]["cek_kasasi"]), ("Toplam Kasa", d["kasa"]["toplam"])]
     elif tab == "kar_zarar":
-        cols = ["Şantiye", "Sözleşme", "Tahsilat", "Genel Gider %6 (Hakediş)", "Doğrudan Gider", "Taşeron Hakediş", "Toplam Gider", "Gerçekleşen Kâr", "Tahmini Kâr (Sözleşme)", "Marj %", "İlerleme %"]
+        cols = ["Şantiye", "Sözleşme", "Tahsilat", "Genel Gider %6 (Tahsilat)", "Doğrudan Gider", "Taşeron Hakediş", "Toplam Gider", "Gerçekleşen Kâr", "Tahmini Kâr (Sözleşme)", "Marj %", "İlerleme %"]
         rows = [[s["name"], s["contract_amount"], s["total_income"], s["realized_overhead"], s["direct_expense"], s["subcontractor_expense"], s["total_expense"], s["realized_profit"], s["estimated_profit"], s["profit_margin"], s["progress_percent"]] for s in d["kar_zarar"]["sites"]]
-        k = d["kar_zarar"]; summ = [("Toplam Gelir (Tahsilat)", k["gelir"]), ("Toplam Gider", k["gider"]), ("Genel Gider (%6 · onaylı müşteri hakedişi)", k["genel_gider"]), ("Net Kâr (Gerçekleşen)", k["net"]), ("Tahmini Kâr (Sözleşme bazlı)", k["tahmini_kar"])]
+        k = d["kar_zarar"]; summ = [("Toplam Gelir (Tahsilat)", k["gelir"]), ("Toplam Gider", k["gider"]), ("Genel Gider (%6 · tahsilat üzerinden)", k["genel_gider"]), ("Net Kâr (Gerçekleşen)", k["net"]), ("Tahmini Kâr (Sözleşme bazlı)", k["tahmini_kar"])]
     elif tab == "musteri_risk":
         cols = ["Müşteri", "Toplam Hakediş", "Tahsil Edilen", "Bakiye", "Vadesi Geçen Çek", "Karşılıksız", "Risk"]
         rows = [[r["name"], r["total_progress"], r["total_paid"], r["balance"], r["overdue"], r["bounced"], ST[r["risk"]]] for r in d["musteri_risk"]]

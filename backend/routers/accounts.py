@@ -16,35 +16,17 @@ class AccountIn(BaseModel):
     specialty: Optional[str] = ""
     notes: Optional[str] = ""
     site_ids: List[str] = []
-    is_active: bool = True
-
-
-class ActiveIn(BaseModel):
-    is_active: bool
 
 
 @router.get("")
-async def list_accounts(type: Optional[str] = None, active: Optional[bool] = None, user=Depends(get_current_user)):
+async def list_accounts(type: Optional[str] = None, user=Depends(get_current_user)):
     q = {"type": type} if type else {}
-    if active is True:
-        q["is_active"] = {"$ne": False}
-    elif active is False:
-        q["is_active"] = False
     accounts = await db.accounts.find(q, {"_id": 0}).sort("name", 1).to_list(1000)
     sites = {s["id"]: s["name"] async for s in db.sites.find({}, {"_id": 0, "id": 1, "name": 1})}
     for a in accounts:
-        a.setdefault("is_active", True)
         a.update(await account_balance(a))
         a["site_names"] = [sites[x] for x in a.get("site_ids", []) if x in sites]
     return accounts
-
-
-@router.patch("/{account_id}/active")
-async def set_active(account_id: str, data: ActiveIn, user=Depends(require_perm("edit_accounts"))):
-    res = await db.accounts.update_one({"id": account_id}, {"$set": {"is_active": data.is_active, "updated_at": now_iso()}})
-    if not res.matched_count:
-        raise HTTPException(status_code=404, detail="Cari bulunamadı")
-    return {"ok": True, "is_active": data.is_active}
 
 
 class AssignIn(BaseModel):
@@ -110,18 +92,15 @@ async def statement(account_id: str, user=Depends(get_current_user)):
     rows = []
     # Müşteri: hakediş = borç (müşteri bize borçlanır), tahsilat = alacak. Taşeron: hakediş = alacak (taşeron alacaklanır), ödeme = avans/borç.
     async for h in db.progress_payments.find({"account_id": account_id, "status": {"$in": ["onaylandi", "odendi"]}}, {"_id": 0}):
-        gross = float(h["net_amount"]) + float(h.get("advance_deduction") or 0)
-        adv = f" (avans mahsubu {h['advance_deduction']:,.0f} ₺ düşüldü, kalan {h['net_amount']:,.0f} ₺)" if h.get("advance_deduction") else ""
-        rows.append({"date": h["date"], "type": "hakedis", "description": f"Hakediş No {h['number']} - {sites.get(h.get('site_id'), '')}{adv}",
-                     "debit": gross if is_customer else 0, "credit": 0 if is_customer else gross, "ref_id": h["id"], "sort": 0})
+        rows.append({"date": h["date"], "type": "hakedis", "description": f"Hakediş No {h['number']} - {sites.get(h.get('site_id'), '')}",
+                     "debit": h["net_amount"] if is_customer else 0, "credit": 0 if is_customer else h["net_amount"], "ref_id": h["id"], "sort": 0})
     ttype = "gelir" if is_customer else "gider"
     kasa_names = {"nakit": "Nakit", "cek": "Çek"}
     async for t in db.transactions.find({"account_id": account_id, "status": "onaylandi", "type": ttype}, {"_id": 0}):
         base = "Tahsilat" if is_customer else "Avans ödemesi"
-        t["site_name"] = sites.get(t.get("site_id")); t["account_name"] = acc["name"]
         rows.append({"date": t["date"], "type": "tahsilat" if is_customer else "avans",
                      "description": f"{base} ({kasa_names.get(t.get('kasa'), '')}) - {t.get('description') or t.get('category')}",
-                     "debit": 0 if is_customer else t["amount"], "credit": t["amount"] if is_customer else 0, "ref_id": t["id"], "sort": 1, "tx": t})
+                     "debit": 0 if is_customer else t["amount"], "credit": t["amount"] if is_customer else 0, "ref_id": t["id"], "sort": 1})
     rows.sort(key=lambda r: (r["date"] or "", r["sort"]))
     bal = 0
     for r in rows:

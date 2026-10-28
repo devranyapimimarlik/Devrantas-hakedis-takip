@@ -27,13 +27,12 @@ function Card({ title, children, testId }) {
 
 function Movements({ rows }) {
   if (!rows.length) return <p className="text-sm text-charcoal-muted py-3">Hareket yok</p>;
-  const tone = (t) => t === "gelir" ? "bg-emerald-50 text-emerald-700" : t === "virman" ? "bg-sky-50 text-sky-700" : "bg-red-50 text-red-700";
   return rows.map((m) => (
     <div key={m.id} className="soft-card p-3 flex items-center gap-3 mb-2" data-testid={`movement-${m.id}`}>
-      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${tone(m.type)}`}>{m.type === "gelir" ? "↙" : m.type === "virman" ? "⇄" : "↗"}</div>
-      <div className="flex-1 min-w-0"><p className="font-semibold truncate">{m.title}</p><p className="text-xs text-charcoal-light">{fmtDate(m.date)} · {m.site_name ? `Şantiye: ${m.site_name} · ` : ""}{m.account_name ? `${m.account_name} · ` : ""}{m.type === "virman" ? `${m.kasa_from_name || m.kasa_from} → ${m.kasa_name}` : (m.kasa_name || m.kasa)}</p>
-        <span className={`inline-block mt-1 text-[11px] px-2 py-0.5 rounded-full ${tone(m.type)}`}>{{ gelir: "Tahsilat", gider: "Ödeme", virman: "Virman (kasalar arası)" }[m.type] || m.type}</span></div>
-      <Money value={m.type === "gider" ? -m.amount : m.amount} signed={m.type !== "virman"} className="font-semibold text-lg shrink-0" />
+      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${m.type === "gelir" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>{m.type === "gelir" ? "↙" : "↗"}</div>
+      <div className="flex-1 min-w-0"><p className="font-semibold truncate">{m.title}</p><p className="text-xs text-charcoal-light">{fmtDate(m.date)} · {m.site_name ? `Şantiye: ${m.site_name} · ` : ""}{m.account_name ? `${m.account_name} · ` : ""}{m.kasa === "cek" ? "Çek" : "Nakit"}</p>
+        <span className={`inline-block mt-1 text-[11px] px-2 py-0.5 rounded-full ${m.type === "gelir" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>{m.type === "gelir" ? "Tahsilat" : "Ödeme"}</span></div>
+      <Money value={m.type === "gider" ? -m.amount : m.amount} signed className="font-semibold text-lg shrink-0" />
     </div>
   ));
 }
