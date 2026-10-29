@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.devrantas.yapi",
+        "sha256_cert_fingerprints": ["A2:4E:B7:34:55:31:78:69:54:10:01:4C:CB:53:32:7E:3F:26:56:C4:CB:57:E4:B0:CA:B7:1C:06:43:69:2B:03"]
+      }
+    }]

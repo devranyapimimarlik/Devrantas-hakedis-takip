@@ -90,3 +90,9 @@
 - Günlük özet `advances`: taşeron ≥30 gün kapatılmamış avans, müşteri avans bakiyeleri; mesajda "💰 Açık avanslar"; DailySummary'de `advance-reminders` linkleri.
 - Twilio: kullanıcı iki kez geçersiz değer girdi (telefon numarası / 5 karakter). Twilio hesabı yok görünüyor; "Twilio hazır" deyince secrets kartı tekrar açılacak. Webhook: /api/whatsapp/inbound.
 - GitHub derleme: kullanıcı henüz Save to GitHub yapmadı; /indir sayfası BuildStatus paneli adımları gösteriyor.
+
+## 2026-06 — Windows .exe ve Android APK doğrudan indirilebilir (object storage üzerinden)
+- Windows: `/app/desktop` @electron/packager (win32-x64, electron 33) + sistem `makensis` (`desktop/installer.nsi`, Türkçe, kullanıcı-düzeyi kurulum, masaüstü/Başlat kısayolu, uninstaller) → `Devrantas-Setup.exe` (74 MB). Exe simgesi Electron varsayılanı (rcedit/wine yok, arm64 pod); kısayollar logo .ico kullanır.
+- Android: PWABuilder CloudAPK API ile TWA paketi → `Devrantas.apk` (2,3 MB, imzalı) + `.aab`; keystore ve şifre `/app/desktop/android-pkg/` (signing-key-info.txt). `frontend/public/.well-known/assetlinks.json` eklendi (tam ekran TWA için). Pod arm64 olduğu için Gradle/aapt2 derlemesi mümkün değil; GitHub Actions yolu da duruyor.
+- Yeni router `routers/downloads.py`: `GET /api/downloads` (liste), `GET /api/downloads/{Devrantas-Setup.exe|Devrantas.apk}` (herkese açık, object storage'dan akıtır), `POST /api/downloads/{name}` (yönetici, dosya güncelleme). İndir sayfası doğrudan linkleri önceliklendirir; yönetici için "Dosya yükle" alanı.
+- Güncelleme yolu: yeni exe/apk üretip İndir sayfasından yükle (veya GitHub Actions release).

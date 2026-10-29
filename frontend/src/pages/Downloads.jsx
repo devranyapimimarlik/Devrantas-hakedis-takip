@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Monitor, Smartphone, Apple, Download, ExternalLink, Github, KeyRound, ListChecks, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { api, errMsg } from "@/lib/api";
@@ -79,19 +79,40 @@ function DistributionForm({ settings, refresh }) {
 export default function Downloads() {
   const { settings, refresh } = useSettings();
   const { isManager } = useAuth();
+  const qc = useQueryClient();
+  const { data: direct = {} } = useQuery({ queryKey: ["downloads"], queryFn: () => api.get("/downloads").then((r) => r.data) });
+  const API = process.env.REACT_APP_BACKEND_URL;
+  const [uploading, setUploading] = useState(null);
+  const uploadPkg = async (name, file) => {
+    if (!file) return;
+    setUploading(name);
+    try { const fd = new FormData(); fd.append("file", file); await api.post(`/downloads/${name}`, fd, { headers: { "Content-Type": "multipart/form-data" }, timeout: 600000 }); toast.success(`${name} yüklendi — indir düğmesi aktif`); qc.invalidateQueries({ queryKey: ["downloads"] }); }
+    catch (e) { toast.error(errMsg(e)); } finally { setUploading(null); }
+  };
   const repo = settings?.github_repo;
   const rel = repo ? `https://github.com/${repo}/releases/latest/download` : null;
   const actions = repo ? `https://github.com/${repo}/actions` : "https://github.com";
+  const exeHref = direct["Devrantas-Setup.exe"] ? `${API}/api/downloads/Devrantas-Setup.exe` : rel && `${rel}/Devrantas-Setup.exe`;
+  const apkHref = direct["Devrantas.apk"] ? `${API}/api/downloads/Devrantas.apk` : rel && `${rel}/Devrantas.apk`;
+  const sizeMB = (n) => n ? `${(n / 1024 / 1024).toFixed(0)} MB` : "";
   return (
     <div data-testid="downloads-page">
       <PageHeader title="Uygulamayı İndir" subtitle="Windows bilgisayar, Android telefon ve iPhone (TestFlight) için kurulum paketleri. Hepsi aynı canlı sisteme bağlanır; kayıtlar ortaktır." />
-      {isManager && <div className="mb-6"><DistributionForm settings={settings} refresh={refresh} /></div>}
+      {isManager && <div className="mb-6"><DistributionForm settings={settings} refresh={refresh} />
+        <div className="soft-card p-4 mt-3 grid sm:grid-cols-2 gap-3" data-testid="package-upload">
+          {[["Devrantas-Setup.exe", "Windows kurulum dosyası (.exe)"], ["Devrantas.apk", "Android paketi (.apk)"]].map(([name, label]) => (
+            <label key={name} className="flex items-center gap-3 text-sm cursor-pointer">
+              <input type="file" className="hidden" accept={name.endsWith(".apk") ? ".apk" : ".exe"} onChange={(e) => uploadPkg(name, e.target.files?.[0])} data-testid={`upload-${name.endsWith(".apk") ? "apk" : "exe"}`} />
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-gold-border bg-white px-3 py-1.5 text-xs font-medium hover:bg-gold-bg">{uploading === name ? "Yükleniyor…" : "Dosya yükle"}</span>
+              <span className="min-w-0"><span className="font-medium">{label}</span><br /><span className="text-xs text-charcoal-light">{direct[name] ? `Yüklü · ${sizeMB(direct[name].size)} · ${new Date(direct[name].updated_at).toLocaleDateString("tr-TR")}` : "Henüz yüklenmedi — GitHub/PWABuilder'dan aldığınız dosyayı buraya yükleyin, personel buradan indirsin"}</span></span>
+            </label>))}
+        </div></div>}
       <div className="grid md:grid-cols-3 gap-4">
-        <PlatformCard icon={Monitor} title="Windows" desc="Başlat menüsüne kurulan masaüstü uygulaması (.exe). Bildirim ve yazdırma destekli." href={rel && `${rel}/Devrantas-Setup.exe`} cta="Devrantas-Setup.exe indir" testId="download-windows"
+        <PlatformCard icon={Monitor} title="Windows" desc={`Başlat menüsüne kurulan masaüstü uygulaması (.exe)${direct["Devrantas-Setup.exe"] ? ` · ${sizeMB(direct["Devrantas-Setup.exe"].size)} · hazır` : ""}. Bildirim ve yazdırma destekli.`} href={exeHref} cta="Devrantas-Setup.exe indir" testId="download-windows"
           disabledNote="İndirme bağlantısı için önce kodu GitHub'a kaydedip yukarıya depo adını yazın; ilk derleme ~10 dk sürer."
-          steps={["İndirilen dosyaya çift tıklayın.", "SmartScreen uyarısı çıkarsa 'Ek bilgi' → 'Yine de çalıştır' (uygulama imzasız olduğu için bir kez görünür).", "Kurulum klasörünü onaylayın; masaüstünde Devrantaş simgesi oluşur.", "Açılınca kullanıcı adı/şifrenizle girin."]} />
-        <PlatformCard icon={Smartphone} title="Android" desc="Mağazasız doğrudan kurulum (APK). Güncellemede aynı dosyayı tekrar indirip kurun." href={rel && `${rel}/Devrantas.apk`} cta="Devrantas.apk indir" testId="download-android"
-          disabledNote="APK bağlantısı GitHub deposu kaydedildikten ve ilk derleme bittikten sonra aktif olur."
+          steps={["İndirilen dosyaya çift tıklayın.", "SmartScreen uyarısı çıkarsa 'Ek bilgi' → 'Yine de çalıştır' (uygulama imzasız olduğu için bir kez görünür).", "Kurulum klasörünü onaylayın; masaüstünde ve Başlat menüsünde Devrantaş kısayolu oluşur.", "Açılınca kullanıcı adı/şifrenizle girin."]} />
+        <PlatformCard icon={Smartphone} title="Android" desc="Mağazasız doğrudan kurulum (APK). Güncellemede aynı dosyayı tekrar indirip kurun." href={apkHref} cta="Devrantas.apk indir" testId="download-android"
+          disabledNote="APK 2 dakikada: bilgisayarda pwabuilder.com → adres kutusuna https://hakedis-takip-3.emergent.host → Start → 'Package for stores' → Android → 'Generate' → indirilen zip içindeki .apk dosyasını yukarıdaki 'Dosya yükle' ile buraya yükleyin. (GitHub Actions ile de otomatik üretilir.)"
           steps={["Telefonda bu sayfayı açıp APK'yı indirin.", "Bildirimden dosyaya dokunun; 'Bu kaynaktan izin ver' deyin (Ayarlar → Bilinmeyen uygulamaları yükle).", "'Yükle' → 'Aç'. Simge ana ekrana gelir.", "Bildirimlere izin verin."]} />
         <PlatformCard icon={Apple} title="iPhone / iPad" desc="Apple'ın test dağıtım uygulaması TestFlight ile kurulur; App Store incelemesi beklenmez." href={settings?.testflight_url || null} cta="TestFlight'ta aç" testId="download-ios"
           disabledNote="TestFlight bağlantısı için aşağıdaki Apple adımlarını tamamlayın; ilk yükleme sonrası App Store Connect'te 'Public Link' oluşturup yukarıya yapıştırın."

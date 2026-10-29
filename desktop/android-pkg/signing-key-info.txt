@@ -1,0 +1,10 @@
+Keep this file and signing.keystore in a safe place. You'll need these files if you want to upload future versions of your PWA to the Google Play Store.
+
+Key store file: signing.keystore
+Key store password: EOT4Gqqx4vlC
+Key alias: devrantas
+Key password: EOT4Gqqx4vlC
+Signer's full name: Devrantas Yapi Mimarlik
+Signer's organization: Devrantas
+Signer's organizational unit: IT
+Signer's country code: TR
